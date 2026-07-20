@@ -65,7 +65,11 @@ export class GpioInput {
       const now = Date.now();
       if (now - (this.#lastEdge.get(offset) ?? 0) < 50) continue;
       this.#lastEdge.set(offset, now);
-      this.#dispatch(this.#buttons.get(offset));
+      try {
+        this.#dispatch(this.#buttons.get(offset));
+      } catch (error) {
+        console.warn(error instanceof Error ? error.message : error);
+      }
     }
   }
 
@@ -78,16 +82,18 @@ export class GpioInput {
 }
 
 async function* readLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
   let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += value;
+    buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split(/\r?\n/);
     buffer = lines.pop() ?? "";
     for (const line of lines) yield line;
   }
+  buffer += decoder.decode();
   if (buffer) yield buffer;
 }
 

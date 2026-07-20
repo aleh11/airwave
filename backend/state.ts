@@ -130,10 +130,9 @@ function normalizeVolume(value: number): number {
 
 function sameStation(a: RadioState["station"], b: RadioState["station"]): boolean {
   if (a === null || b === null) return a === b;
-  return a.id === b.id && a.url === b.url;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function outputStatusesMatch(a: RadioState["outputStatus"], b: RadioState["outputStatus"]): boolean {
   return a.kind === b.kind && a.message === b.message;
 }
-

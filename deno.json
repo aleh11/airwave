@@ -1,6 +1,10 @@
 {
   "lock": true,
   "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["deno.ns", "dom", "dom.iterable", "esnext"]
+  },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.18",
     "@std/http": "jsr:@std/http@^1.0.21",

@@ -28,6 +28,9 @@ export function createApiHandler(
       if (favoriteMatch && (request.method === "PUT" || request.method === "DELETE")) {
         const id = parseId(favoriteMatch.pathname.groups.id);
         const station = database.setFavorite(id, request.method === "PUT");
+        if (station && machine.state.station?.id === id) {
+          machine.dispatch({ type: "setStation", station }, "system");
+        }
         return station ? json({ station }) : notFound("Station not found.");
       }
       const stationMatch = stationPattern.exec(url);
@@ -145,4 +148,3 @@ function json(value: unknown, status = 200): Response {
 function notFound(message: string): Response {
   return json({ error: message }, 404);
 }
-

@@ -8,7 +8,9 @@ export class StatePersistence {
     this.#unsubscribe = machine.subscribe(({ previous, current }) => {
       if (previous.volume !== current.volume) database.setSetting("volume", current.volume);
       if (previous.target !== current.target) database.setSetting("target", current.target);
-      if (previous.alarm !== current.alarm) database.setSetting("alarm", current.alarm);
+      if (previous.alarm?.at !== current.alarm?.at || previous.alarm?.stationId !== current.alarm?.stationId) {
+        database.setSetting("alarm", current.alarm);
+      }
     });
   }
 

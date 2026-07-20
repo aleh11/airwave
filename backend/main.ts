@@ -25,6 +25,7 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
   const alarm = settings.alarm && new Date(settings.alarm.at).getTime() > Date.now()
     ? settings.alarm
     : null;
+  if (settings.alarm && !alarm) database.setSetting("alarm", null);
   const machine = new RadioStateMachine(createInitialState({
     volume: validVolume(settings.volume) ? settings.volume : 72,
     target: validTarget(settings.target) ? settings.target : "browser",

@@ -16,9 +16,20 @@ export class MpvOutput {
     this.#socketPath = socketPath;
     this.#unsubscribe = machine.subscribe(({ previous, current }) => {
       if (current.target !== "appliance") {
-        if (previous.target === "appliance") this.#enqueue(["set_property", "pause", true]);
+        if (previous.target === "appliance") {
+          this.#enqueue(["set_property", "pause", true]);
+          this.#machine.dispatch(
+            { type: "setOutputStatus", status: { kind: "idle", message: null } },
+            "system",
+          );
+        }
         return;
       }
+      const playbackChanged = previous.target !== current.target ||
+        previous.station?.url !== current.station?.url ||
+        previous.playing !== current.playing ||
+        previous.volume !== current.volume;
+      if (!playbackChanged) return;
       this.#sync(current);
     });
   }
@@ -111,4 +122,3 @@ export class MpvOutput {
     return this.#writeChain;
   }
 }
-
