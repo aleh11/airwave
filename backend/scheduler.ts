@@ -12,7 +12,9 @@ export class RadioScheduler {
     this.#machine = machine;
     this.#database = database;
     this.#unsubscribe = machine.subscribe(({ previous, current }) => {
-      if (previous.sleepTimerEndsAt !== current.sleepTimerEndsAt) this.#scheduleSleep();
+      if (previous.sleepTimerEndsAt !== current.sleepTimerEndsAt) {
+        this.#scheduleSleep();
+      }
       if (previous.alarm?.at !== current.alarm?.at) this.#scheduleAlarm();
     });
     this.#scheduleSleep();
@@ -27,10 +29,13 @@ export class RadioScheduler {
 
   #scheduleSleep(): void {
     this.#cancelSleep?.();
-    this.#cancelSleep = this.#scheduleAt(this.#machine.state.sleepTimerEndsAt, () => {
-      this.#machine.dispatch({ type: "pause" }, "scheduler");
-      this.#machine.dispatch({ type: "clearSleepTimer" }, "scheduler");
-    });
+    this.#cancelSleep = this.#scheduleAt(
+      this.#machine.state.sleepTimerEndsAt,
+      () => {
+        this.#machine.dispatch({ type: "pause" }, "scheduler");
+        this.#machine.dispatch({ type: "clearSleepTimer" }, "scheduler");
+      },
+    );
   }
 
   #scheduleAlarm(): void {

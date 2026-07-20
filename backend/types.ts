@@ -65,7 +65,12 @@ export type RadioCommand =
   | { type: "clearAlarm" }
   | { type: "setOutputStatus"; status: OutputStatus };
 
-export type CommandSource = "websocket" | "gpio" | "metadata" | "scheduler" | "system";
+export type CommandSource =
+  | "websocket"
+  | "gpio"
+  | "metadata"
+  | "scheduler"
+  | "system";
 
 export interface StateChange {
   previous: RadioState;
@@ -94,4 +99,3 @@ export interface ListeningStats {
     nowPlaying: string | null;
   }>;
 }
-

@@ -23,16 +23,22 @@ export function useRadioSocket(onError: (message: string) => void) {
 
   useEffect(() => {
     let stopped = false;
-    let reconnectTimer: number | undefined;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let attempt = 0;
     const connect = () => {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      const protocol = globalThis.location.protocol === "https:"
+        ? "wss:"
+        : "ws:";
+      const socket = new WebSocket(
+        `${protocol}//${globalThis.location.host}/ws`,
+      );
       socketRef.current = socket;
       socket.addEventListener("open", () => {
         attempt = 0;
         setConnected(true);
-        for (const command of commandQueue.current.splice(0)) socket.send(JSON.stringify(command));
+        for (const command of commandQueue.current.splice(0)) {
+          socket.send(JSON.stringify(command));
+        }
       });
       socket.addEventListener("message", (event) => {
         const message = JSON.parse(event.data) as SocketMessage;
@@ -41,13 +47,15 @@ export function useRadioSocket(onError: (message: string) => void) {
           setRole(message.role);
           setPlayerConnected(Boolean(message.playerConnected));
         }
-        if (message.type === "error" && message.message) errorHandler.current(message.message);
+        if (message.type === "error" && message.message) {
+          errorHandler.current(message.message);
+        }
       });
       socket.addEventListener("close", () => {
         setConnected(false);
         if (stopped) return;
         const delay = Math.min(10_000, 500 * 2 ** attempt++);
-        reconnectTimer = window.setTimeout(connect, delay);
+        reconnectTimer = setTimeout(connect, delay);
       });
       socket.addEventListener("error", () => socket.close());
     };
@@ -55,15 +63,16 @@ export function useRadioSocket(onError: (message: string) => void) {
     connect();
     return () => {
       stopped = true;
-      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       socketRef.current?.close();
     };
   }, []);
 
   const send = useCallback((command: RadioCommand) => {
     const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(command));
-    else commandQueue.current.push(command);
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(command));
+    } else commandQueue.current.push(command);
   }, []);
 
   return { state, role, connected, playerConnected, send };

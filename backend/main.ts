@@ -1,5 +1,6 @@
 import { serveDir, serveFile } from "@std/http/file-server";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createApiHandler } from "./api.ts";
 import { RadioDatabase } from "./db.ts";
 import { HistoryRecorder } from "./history.ts";
@@ -18,13 +19,15 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
   const host = Deno.env.get("RADIO_HOST") ?? "127.0.0.1";
   const port = Number(Deno.env.get("RADIO_PORT") ?? 8787);
   const dbPath = Deno.env.get("RADIO_DB_PATH") ?? "./data/radio.db";
-  const webRoot = resolve(Deno.env.get("RADIO_WEB_ROOT") ?? "./web/dist");
+  const bundledWebRoot = fileURLToPath(new URL("../web/dist", import.meta.url));
+  const webRoot = resolve(Deno.env.get("RADIO_WEB_ROOT") ?? bundledWebRoot);
   const devUrl = Deno.env.get("RADIO_WEB_DEV_URL");
   const database = await RadioDatabase.open(dbPath);
   const settings = database.getSettings();
-  const alarm = settings.alarm && new Date(settings.alarm.at).getTime() > Date.now()
-    ? settings.alarm
-    : null;
+  const alarm =
+    settings.alarm && new Date(settings.alarm.at).getTime() > Date.now()
+      ? settings.alarm
+      : null;
   if (settings.alarm && !alarm) database.setSetting("alarm", null);
   const machine = new RadioStateMachine(createInitialState({
     volume: validVolume(settings.volume) ? settings.volume : 72,
@@ -32,7 +35,10 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
     alarm,
   }));
   const hub = new WebSocketHub(machine);
-  const browserOutput = new BrowserOutput(machine, (state) => hub.publishState(state));
+  const browserOutput = new BrowserOutput(
+    machine,
+    (state) => hub.publishState(state),
+  );
   const history = new HistoryRecorder(machine, database);
   const persistence = new StatePersistence(machine, database);
   const metadata = new MetadataSniffer(machine);
@@ -43,7 +49,9 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
     Deno.env.get("RADIO_MPV_SOCKET") ?? "/tmp/radio-deck-mpv.sock",
   );
   const gpio = createGpioInput(machine, database);
-  gpio?.start().catch((error) => console.error(`GPIO disabled: ${error.message}`));
+  gpio?.start().catch((error) =>
+    console.error(`GPIO disabled: ${error.message}`)
+  );
   const api = createApiHandler(database, new RadioBrowserClient(), machine);
 
   const close = async () => {
@@ -60,7 +68,8 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
   const server = Deno.serve({
     hostname: host,
     port,
-    onListen: ({ hostname, port }) => console.log(`Radio Deck listening on http://${hostname}:${port}`),
+    onListen: ({ hostname, port }) =>
+      console.log(`Radio Deck listening on http://${hostname}:${port}`),
   }, async (request) => {
     const url = new URL(request.url);
     if (url.pathname === "/ws") return hub.handle(request);
@@ -78,7 +87,10 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
   return server;
 }
 
-function createGpioInput(machine: RadioStateMachine, database: RadioDatabase): GpioInput | null {
+function createGpioInput(
+  machine: RadioStateMachine,
+  database: RadioDatabase,
+): GpioInput | null {
   const chip = Deno.env.get("RADIO_GPIO_CHIP");
   if (!chip) return null;
   let buttons: Record<string, "toggle" | "next" | "volumeUp" | "volumeDown">;
@@ -90,26 +102,39 @@ function createGpioInput(machine: RadioStateMachine, database: RadioDatabase): G
   } catch {
     throw new Error("RADIO_GPIO_BUTTONS must be a JSON object.");
   }
+  const bias = Deno.env.get("RADIO_GPIO_BIAS") ?? "pull-up";
+  if (bias !== "pull-up" && bias !== "external") {
+    throw new Error("RADIO_GPIO_BIAS must be pull-up or external.");
+  }
   return new GpioInput(machine, chip, buttons, () => {
-    const favorites = database.listStations().filter((station) => station.favorite);
+    const favorites = database.listStations().filter((station) =>
+      station.favorite
+    );
     if (favorites.length === 0) return;
-    const currentIndex = favorites.findIndex((station) => station.id === machine.state.station?.id);
+    const currentIndex = favorites.findIndex((station) =>
+      station.id === machine.state.station?.id
+    );
     const station = favorites[(currentIndex + 1) % favorites.length];
     machine.dispatch({ type: "setStation", station }, "gpio");
     machine.dispatch({ type: "play" }, "gpio");
-  });
+  }, bias);
 }
 
-async function serveFrontend(request: Request, webRoot: string): Promise<Response> {
+async function serveFrontend(
+  request: Request,
+  webRoot: string,
+): Promise<Response> {
   const response = await serveDir(request, { fsRoot: webRoot, quiet: true });
   if (response.status !== 404) return response;
   try {
-    return await serveFile(request, resolve(webRoot, "index.html"));
+    const index = await serveFile(request, resolve(webRoot, "index.html"));
+    if (index.status !== 404) return index;
   } catch {
-    return Response.json({
-      error: "Frontend build not found. Run `deno task build` first.",
-    }, { status: 503 });
+    void 0;
   }
+  return Response.json({
+    error: "Frontend build not found. Run `deno task build` first.",
+  }, { status: 503 });
 }
 
 async function proxyToVite(request: Request, base: string): Promise<Response> {
@@ -126,10 +151,13 @@ async function proxyToVite(request: Request, base: string): Promise<Response> {
 }
 
 function validVolume(value: number | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 &&
+    value <= 100;
 }
 
-function validTarget(value: PlaybackTarget | undefined): value is PlaybackTarget {
+function validTarget(
+  value: PlaybackTarget | undefined,
+): value is PlaybackTarget {
   return value === "browser" || value === "appliance";
 }
 

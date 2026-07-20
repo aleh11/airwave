@@ -10,7 +10,11 @@ export class MpvOutput {
   #writeChain = Promise.resolve();
   #unsubscribe: () => void;
 
-  constructor(machine: RadioStateMachine, command = "mpv", socketPath = "/tmp/radio-deck-mpv.sock") {
+  constructor(
+    machine: RadioStateMachine,
+    command = "mpv",
+    socketPath = "/tmp/radio-deck-mpv.sock",
+  ) {
     this.#machine = machine;
     this.#command = command;
     this.#socketPath = socketPath;
@@ -19,7 +23,10 @@ export class MpvOutput {
         if (previous.target === "appliance") {
           this.#enqueue(["set_property", "pause", true]);
           this.#machine.dispatch(
-            { type: "setOutputStatus", status: { kind: "idle", message: null } },
+            {
+              type: "setOutputStatus",
+              status: { kind: "idle", message: null },
+            },
             "system",
           );
         }
@@ -55,7 +62,10 @@ export class MpvOutput {
       await this.#enqueue(["set_property", "volume", state.volume]);
       await this.#enqueue(["set_property", "pause", !state.playing]);
       this.#machine.dispatch(
-        { type: "setOutputStatus", status: { kind: "ready", message: "Appliance output ready" } },
+        {
+          type: "setOutputStatus",
+          status: { kind: "ready", message: "Appliance output ready" },
+        },
         "system",
       );
     }).catch((error) => {
@@ -63,7 +73,9 @@ export class MpvOutput {
         type: "setOutputStatus",
         status: {
           kind: "error",
-          message: error instanceof Error ? error.message : "mpv could not start",
+          message: error instanceof Error
+            ? error.message
+            : "mpv could not start",
         },
       }, "system");
     });
@@ -92,13 +104,18 @@ export class MpvOutput {
       this.#process = null;
       this.#loadedUrl = null;
       if (!success && process?.stderr) {
-        const message = new TextDecoder().decode(await process.stderr.getReader().read().then((v) => v.value));
+        const message = new TextDecoder().decode(
+          await process.stderr.getReader().read().then((v) => v.value),
+        );
         console.warn(message);
       }
     });
     for (let attempt = 0; attempt < 30; attempt++) {
       try {
-        const connection = await Deno.connect({ transport: "unix", path: this.#socketPath });
+        const connection = await Deno.connect({
+          transport: "unix",
+          path: this.#socketPath,
+        });
         connection.close();
         return;
       } catch {
@@ -111,9 +128,14 @@ export class MpvOutput {
   #enqueue(command: unknown[]): Promise<void> {
     this.#writeChain = this.#writeChain.then(async () => {
       if (!this.#process) return;
-      const connection = await Deno.connect({ transport: "unix", path: this.#socketPath });
+      const connection = await Deno.connect({
+        transport: "unix",
+        path: this.#socketPath,
+      });
       try {
-        const payload = new TextEncoder().encode(`${JSON.stringify({ command })}\n`);
+        const payload = new TextEncoder().encode(
+          `${JSON.stringify({ command })}\n`,
+        );
         await connection.write(payload);
       } finally {
         connection.close();

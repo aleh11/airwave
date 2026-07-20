@@ -1,6 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import { dirname } from "node:path";
-import type { Alarm, ListeningStats, PlaybackTarget, Station, StationInput } from "./types.ts";
+import type {
+  Alarm,
+  ListeningStats,
+  PlaybackTarget,
+  Station,
+  StationInput,
+} from "./types.ts";
 
 export interface PersistedSettings {
   volume?: number;
@@ -25,12 +31,16 @@ export class RadioDatabase {
 
   private constructor(path: string) {
     this.#db = new DatabaseSync(path);
-    this.#db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+    this.#db.exec(
+      "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;",
+    );
     this.#migrate();
   }
 
   static async open(path: string): Promise<RadioDatabase> {
-    if (path !== ":memory:") await Deno.mkdir(dirname(path), { recursive: true });
+    if (path !== ":memory:") {
+      await Deno.mkdir(dirname(path), { recursive: true });
+    }
     return new RadioDatabase(path);
   }
 
@@ -94,18 +104,23 @@ export class RadioDatabase {
       id,
     );
     if (result.changes === 0) return null;
-    if (typeof input.favorite === "boolean") this.setFavorite(id, input.favorite);
+    if (typeof input.favorite === "boolean") {
+      this.setFavorite(id, input.favorite);
+    }
     return this.getStation(id);
   }
 
   deleteStation(id: number): boolean {
-    return this.#db.prepare("DELETE FROM stations WHERE id = ?").run(id).changes > 0;
+    return this.#db.prepare("DELETE FROM stations WHERE id = ?").run(id)
+      .changes > 0;
   }
 
   setFavorite(id: number, favorite: boolean): Station | null {
     if (!this.getStation(id)) return null;
     if (favorite) {
-      this.#db.prepare("INSERT OR IGNORE INTO favorites (station_id) VALUES (?)").run(id);
+      this.#db.prepare(
+        "INSERT OR IGNORE INTO favorites (station_id) VALUES (?)",
+      ).run(id);
     } else {
       this.#db.prepare("DELETE FROM favorites WHERE station_id = ?").run(id);
     }
@@ -127,7 +142,10 @@ export class RadioDatabase {
   }
 
   updateListeningTitle(id: number, title: string | null): void {
-    this.#db.prepare("UPDATE history SET now_playing = ? WHERE id = ?").run(title, id);
+    this.#db.prepare("UPDATE history SET now_playing = ? WHERE id = ?").run(
+      title,
+      id,
+    );
   }
 
   getStats(): ListeningStats {
@@ -161,14 +179,17 @@ export class RadioDatabase {
   }
 
   getSettings(): PersistedSettings {
-    const rows = this.#db.prepare("SELECT key, value FROM settings").all() as unknown as Array<{
-      key: string;
-      value: string;
-    }>;
+    const rows = this.#db.prepare("SELECT key, value FROM settings")
+      .all() as unknown as Array<{
+        key: string;
+        value: string;
+      }>;
     const settings: PersistedSettings = {};
     for (const row of rows) {
       try {
-        if (row.key === "volume") settings.volume = Number(JSON.parse(row.value));
+        if (row.key === "volume") {
+          settings.volume = Number(JSON.parse(row.value));
+        }
         if (row.key === "target") settings.target = JSON.parse(row.value);
         if (row.key === "alarm") settings.alarm = JSON.parse(row.value);
       } catch {
@@ -219,9 +240,10 @@ export class RadioDatabase {
       CREATE INDEX IF NOT EXISTS history_started_idx ON history(started_at DESC);
       UPDATE history SET ended_at = started_at WHERE ended_at IS NULL;
     `);
-    const count = this.#db.prepare("SELECT COUNT(*) AS count FROM stations").get() as unknown as {
-      count: number;
-    };
+    const count = this.#db.prepare("SELECT COUNT(*) AS count FROM stations")
+      .get() as unknown as {
+        count: number;
+      };
     if (count.count === 0) this.#seed();
   }
 
@@ -256,7 +278,9 @@ function mapStation(row: StationRow): Station {
   let tags: string[] = [];
   try {
     const parsed = JSON.parse(row.tags);
-    if (Array.isArray(parsed)) tags = parsed.filter((value) => typeof value === "string");
+    if (Array.isArray(parsed)) {
+      tags = parsed.filter((value) => typeof value === "string");
+    }
   } catch {
     tags = row.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
   }
@@ -272,4 +296,3 @@ function mapStation(row: StationRow): Station {
     favorite: Boolean(row.favorite),
   };
 }
-

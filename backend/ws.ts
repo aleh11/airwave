@@ -26,7 +26,10 @@ export class WebSocketHub {
       this.#send(client, { type: "state", state: this.#machine.state });
       this.#sendRole(client);
     });
-    socket.addEventListener("message", (event) => this.#onMessage(client, event.data));
+    socket.addEventListener(
+      "message",
+      (event) => this.#onMessage(client, event.data),
+    );
     socket.addEventListener("close", () => this.#remove(client));
     socket.addEventListener("error", () => this.#remove(client));
     return response;
@@ -38,22 +41,31 @@ export class WebSocketHub {
 
   #onMessage(client: Client, data: unknown): void {
     try {
-      if (typeof data !== "string") throw new RadioCommandError("Command must be JSON text.");
+      if (typeof data !== "string") {
+        throw new RadioCommandError("Command must be JSON text.");
+      }
       const command = validatePublicCommand(JSON.parse(data));
-      if ((command.type === "play" || command.type === "togglePlayback") && !this.#machine.state.playing) {
+      if (
+        (command.type === "play" || command.type === "togglePlayback") &&
+        !this.#machine.state.playing
+      ) {
         this.#claimPlayer(client);
       }
       this.#machine.dispatch(command, "websocket");
     } catch (error) {
       this.#send(client, {
         type: "error",
-        message: error instanceof Error ? error.message : "Command could not be applied.",
+        message: error instanceof Error
+          ? error.message
+          : "Command could not be applied.",
       });
     }
   }
 
   #claimPlayer(client: Client): void {
-    if (this.#machine.state.target !== "browser" || this.#browserPlayerId) return;
+    if (this.#machine.state.target !== "browser" || this.#browserPlayerId) {
+      return;
+    }
     this.#browserPlayerId = client.id;
     this.#broadcastRoles();
   }
@@ -62,7 +74,9 @@ export class WebSocketHub {
     if (!this.#clients.delete(client)) return;
     if (this.#browserPlayerId === client.id) {
       this.#browserPlayerId = null;
-      if (this.#machine.state.target === "browser" && this.#machine.state.playing) {
+      if (
+        this.#machine.state.target === "browser" && this.#machine.state.playing
+      ) {
         this.#machine.dispatch({ type: "pause" }, "system");
       }
       this.#broadcastRoles();
@@ -96,7 +110,9 @@ export class WebSocketHub {
 }
 
 function validatePublicCommand(value: unknown): RadioCommand {
-  if (!value || typeof value !== "object") throw new RadioCommandError("Command is invalid.");
+  if (!value || typeof value !== "object") {
+    throw new RadioCommandError("Command is invalid.");
+  }
   const command = value as Record<string, unknown>;
   switch (command.type) {
     case "play":
@@ -106,10 +122,14 @@ function validatePublicCommand(value: unknown): RadioCommand {
     case "clearAlarm":
       return { type: command.type };
     case "setVolume":
-      if (typeof command.volume !== "number") throw new RadioCommandError("Volume is invalid.");
+      if (typeof command.volume !== "number") {
+        throw new RadioCommandError("Volume is invalid.");
+      }
       return { type: "setVolume", volume: command.volume };
     case "adjustVolume":
-      if (typeof command.delta !== "number") throw new RadioCommandError("Volume adjustment is invalid.");
+      if (typeof command.delta !== "number") {
+        throw new RadioCommandError("Volume adjustment is invalid.");
+      }
       return { type: "adjustVolume", delta: command.delta };
     case "setTarget":
       if (command.target !== "browser" && command.target !== "appliance") {
@@ -119,14 +139,22 @@ function validatePublicCommand(value: unknown): RadioCommand {
     case "setStation":
       return { type: "setStation", station: validateStation(command.station) };
     case "setSleepTimer":
-      if (typeof command.minutes !== "number") throw new RadioCommandError("Sleep timer is invalid.");
+      if (typeof command.minutes !== "number") {
+        throw new RadioCommandError("Sleep timer is invalid.");
+      }
       return { type: "setSleepTimer", minutes: command.minutes };
     case "setAlarm": {
       const alarm = command.alarm as Record<string, unknown> | null;
-      if (!alarm || typeof alarm.at !== "string" || typeof alarm.stationId !== "number") {
+      if (
+        !alarm || typeof alarm.at !== "string" ||
+        typeof alarm.stationId !== "number"
+      ) {
         throw new RadioCommandError("Alarm is invalid.");
       }
-      return { type: "setAlarm", alarm: { at: alarm.at, stationId: alarm.stationId } };
+      return {
+        type: "setAlarm",
+        alarm: { at: alarm.at, stationId: alarm.stationId },
+      };
     }
     default:
       throw new RadioCommandError("Command is not supported.");
@@ -135,10 +163,13 @@ function validatePublicCommand(value: unknown): RadioCommand {
 
 function validateStation(value: unknown): Station | null {
   if (value === null) return null;
-  if (!value || typeof value !== "object") throw new RadioCommandError("Station is invalid.");
+  if (!value || typeof value !== "object") {
+    throw new RadioCommandError("Station is invalid.");
+  }
   const station = value as Record<string, unknown>;
   if (
-    !Number.isInteger(station.id) || typeof station.id !== "number" || station.id <= 0 ||
+    !Number.isInteger(station.id) || typeof station.id !== "number" ||
+    station.id <= 0 ||
     typeof station.name !== "string" || !station.name.trim() ||
     typeof station.url !== "string" || !isHttpUrl(station.url) ||
     !Array.isArray(station.tags)
@@ -150,7 +181,8 @@ function validateStation(value: unknown): Station | null {
     name: station.name.slice(0, 160),
     url: station.url,
     favicon: typeof station.favicon === "string" ? station.favicon : null,
-    tags: station.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 12),
+    tags: station.tags.filter((tag): tag is string => typeof tag === "string")
+      .slice(0, 12),
     country: typeof station.country === "string" ? station.country : null,
     codec: typeof station.codec === "string" ? station.codec : null,
     bitrate: typeof station.bitrate === "number" ? station.bitrate : null,

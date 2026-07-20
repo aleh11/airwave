@@ -34,4 +34,3 @@ addEventListener("unload", signal);
 
 await Promise.race([server.status, web.status]);
 signal();
-

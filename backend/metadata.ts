@@ -13,7 +13,10 @@ export class MetadataSniffer {
       const isActive = current.playing && current.station;
       if (!isActive) {
         this.#stop();
-        this.#machine.dispatch({ type: "setNowPlaying", title: null }, "metadata");
+        this.#machine.dispatch(
+          { type: "setNowPlaying", title: null },
+          "metadata",
+        );
         return;
       }
       if (!wasActive || previous.station?.url !== current.station?.url) {
@@ -34,7 +37,11 @@ export class MetadataSniffer {
     this.#abortController = controller;
     this.#sniff(url, controller.signal).catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      console.warn(`Metadata unavailable for ${url}: ${error instanceof Error ? error.message : error}`);
+      console.warn(
+        `Metadata unavailable for ${url}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
     });
   }
 
@@ -53,7 +60,9 @@ export class MetadataSniffer {
       redirect: "follow",
       signal,
     });
-    if (!response.ok || !response.body) throw new Error(`Stream returned ${response.status}.`);
+    if (!response.ok || !response.body) {
+      throw new Error(`Stream returned ${response.status}.`);
+    }
     const interval = Number(response.headers.get("icy-metaint"));
     if (!Number.isInteger(interval) || interval <= 0) return;
     const reader = new ExactStreamReader(response.body.getReader());
@@ -74,7 +83,9 @@ export class MetadataSniffer {
 }
 
 export function parseStreamTitle(metadata: string): string | null {
-  const match = metadata.replace(/\0/g, "").match(/StreamTitle='((?:[^']|'')*)';/i);
+  const match = metadata.replace(/\0/g, "").match(
+    /StreamTitle='((?:[^']|'')*)';/i,
+  );
   const title = match?.[1]?.replace(/''/g, "'").trim();
   return title || null;
 }
@@ -101,4 +112,3 @@ class ExactStreamReader {
     return result;
   }
 }
-
