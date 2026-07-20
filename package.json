@@ -1,0 +1,23 @@
+{
+  "name": "radio-deck",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build web",
+    "dev": "vite --host 0.0.0.0 web",
+    "typecheck": "tsc --noEmit -p web/tsconfig.json"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "vite": "8.1.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "tailwindcss": "4.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}
