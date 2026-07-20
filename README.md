@@ -107,31 +107,31 @@ and set `RADIO_GPIO_BIAS=external`.
 
 ## Raspberry Pi deployment
 
-Install the two hardware packages:
+Copy the ARM64 binary and installer to the Pi:
 
 ```bash
-sudo apt update
-sudo apt install mpv gpiod
+scp build/radio-linux-arm64 install.sh pi@raspberrypi.local:~/
 ```
 
-Copy the binary and deployment files, then create the service account and state
-directory:
+Then run one setup command on the Pi:
 
 ```bash
-scp build/radio-linux-arm64 pi@raspberrypi.local:/tmp/radio-deck
-scp deploy/radio-deck.service deploy/radio-deck.env.example pi@raspberrypi.local:/tmp/
-ssh pi@raspberrypi.local
-sudo useradd --system --user-group --home /var/lib/radio-deck --shell /usr/sbin/nologin radio-deck
-sudo usermod -aG audio,gpio radio-deck
-sudo install -m 0755 /tmp/radio-deck /usr/local/bin/radio-deck
-sudo install -m 0644 /tmp/radio-deck.service /etc/systemd/system/radio-deck.service
-sudo install -m 0644 /tmp/radio-deck.env.example /etc/radio-deck.env
-sudo systemctl daemon-reload
-sudo systemctl enable --now radio-deck
+sudo ./install.sh
 ```
 
-Edit `/etc/radio-deck.env` to match the Pi's GPIO chip and line offsets. Open
-`http://raspberrypi.local:8787` from another device on the same network.
+The installer adds `mpv` and `gpiod`, creates the locked-down service account,
+detects the Pi GPIO chip when possible, installs the binary and systemd unit,
+starts Radio Deck, and prints its dashboard URL. It is safe to run again for an
+upgrade and preserves an existing `/etc/radio-deck.env`.
+
+The binary may also be passed explicitly:
+
+```bash
+sudo ./install.sh /path/to/radio-linux-arm64
+```
+
+Edit `/etc/radio-deck.env` if the detected GPIO chip or button lines need to be
+changed, then run `sudo systemctl restart radio-deck`.
 
 ## GPIO wiring
 
