@@ -59,6 +59,8 @@ The SQLite database is created at `./data/airwave.db`. The server binds to
 
 ## Verify
 
+Run the full quality gate before committing a release:
+
 ```bash
 deno task check
 deno task test
@@ -150,15 +152,13 @@ The installer downloads the latest ARM64 binary and its SHA-256 checksum,
 verifies it, installs system dependencies, configures the systemd service, and
 prints the dashboard URL.
 
-To publish a release, push a version tag:
+To publish a release, update the `version` field in `package.json` and push the
+change to `main`. That version is the single source of truth for the app and
+release tag.
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The release workflow verifies the project, cross-compiles the Pi binary, and
-attaches the binary, checksum, and installer to the GitHub Release.
+The release workflow rejects invalid or previously released versions, verifies
+the project, cross-compiles the Pi binary, creates the matching `vX.Y.Z` tag,
+and attaches the binary, checksum, and installer to the GitHub Release.
 
 For a manual/offline installation, copy the ARM64 binary and installer to the
 Pi:

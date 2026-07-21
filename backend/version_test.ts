@@ -22,7 +22,7 @@ Deno.test("release checker returns the latest GitHub release", async () => {
       })),
   );
   assertEquals(await checker.check(), {
-    current: "0.1.0",
+    current: "0.1.6",
     latest: "0.2.0",
     updateAvailable: true,
     releaseUrl: "https://github.com/example/airwave/releases/tag/v0.2.0",
