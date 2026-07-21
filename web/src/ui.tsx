@@ -51,7 +51,7 @@ export function ReceiverLoading({ connected }: { connected: boolean }) {
     <Card padding={8} minHeight={320}>
       <VStack gap={5} hAlign="center" vAlign="center" minHeight={260}>
         <Icon icon={Radio} color="accent" size="lg" />
-        <Heading level={2}>Connecting to Radio Deck</Heading>
+        <Heading level={2}>Connecting to Airwave</Heading>
         <Text color="secondary">
           {connected
             ? "Synchronising receiver state…"

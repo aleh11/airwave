@@ -55,7 +55,7 @@ export class MetadataSniffer {
     const response = await fetch(url, {
       headers: {
         "Icy-MetaData": "1",
-        "User-Agent": "RadioDeck/1.0",
+        "User-Agent": "Airwave/1.0",
       },
       redirect: "follow",
       signal,

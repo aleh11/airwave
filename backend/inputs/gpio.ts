@@ -116,7 +116,7 @@ export function buildGpiomonArgs(
 ): string[] {
   if (bias === "pull-up" && !capabilities.supportsBias) {
     throw new Error(
-      "This gpiomon version cannot request pull-ups. Upgrade libgpiod or set RADIO_GPIO_BIAS=external and wire external pull-up resistors.",
+      "This gpiomon version cannot request pull-ups. Upgrade libgpiod or set AIRWAVE_GPIO_BIAS=external and wire external pull-up resistors.",
     );
   }
   const biasArgs = bias === "pull-up" ? ["--bias=pull-up"] : [];

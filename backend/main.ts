@@ -15,13 +15,13 @@ import { createInitialState, RadioStateMachine } from "./state.ts";
 import type { PlaybackTarget } from "./types.ts";
 import { WebSocketHub } from "./ws.ts";
 
-export async function startRadioDeck(): Promise<Deno.HttpServer> {
-  const host = Deno.env.get("RADIO_HOST") ?? "127.0.0.1";
-  const port = Number(Deno.env.get("RADIO_PORT") ?? 8787);
-  const dbPath = Deno.env.get("RADIO_DB_PATH") ?? "./data/radio.db";
+export async function startAirwave(): Promise<Deno.HttpServer> {
+  const host = Deno.env.get("AIRWAVE_HOST") ?? "127.0.0.1";
+  const port = Number(Deno.env.get("AIRWAVE_PORT") ?? 8787);
+  const dbPath = Deno.env.get("AIRWAVE_DB_PATH") ?? "./data/airwave.db";
   const bundledWebRoot = fileURLToPath(new URL("../web/dist", import.meta.url));
-  const webRoot = resolve(Deno.env.get("RADIO_WEB_ROOT") ?? bundledWebRoot);
-  const devUrl = Deno.env.get("RADIO_WEB_DEV_URL");
+  const webRoot = resolve(Deno.env.get("AIRWAVE_WEB_ROOT") ?? bundledWebRoot);
+  const devUrl = Deno.env.get("AIRWAVE_WEB_DEV_URL");
   const database = await RadioDatabase.open(dbPath);
   const settings = database.getSettings();
   const alarm =
@@ -45,8 +45,8 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
   const scheduler = new RadioScheduler(machine, database);
   const mpv = new MpvOutput(
     machine,
-    Deno.env.get("RADIO_MPV_COMMAND") ?? "mpv",
-    Deno.env.get("RADIO_MPV_SOCKET") ?? "/tmp/radio-deck-mpv.sock",
+    Deno.env.get("AIRWAVE_MPV_COMMAND") ?? "mpv",
+    Deno.env.get("AIRWAVE_MPV_SOCKET") ?? "/tmp/airwave-mpv.sock",
   );
   const gpio = createGpioInput(machine, database);
   gpio?.start().catch((error) =>
@@ -69,7 +69,7 @@ export async function startRadioDeck(): Promise<Deno.HttpServer> {
     hostname: host,
     port,
     onListen: ({ hostname, port }) =>
-      console.log(`Radio Deck listening on http://${hostname}:${port}`),
+      console.log(`Airwave listening on http://${hostname}:${port}`),
   }, async (request) => {
     const url = new URL(request.url);
     if (url.pathname === "/ws") return hub.handle(request);
@@ -91,20 +91,20 @@ function createGpioInput(
   machine: RadioStateMachine,
   database: RadioDatabase,
 ): GpioInput | null {
-  const chip = Deno.env.get("RADIO_GPIO_CHIP");
+  const chip = Deno.env.get("AIRWAVE_GPIO_CHIP");
   if (!chip) return null;
   let buttons: Record<string, "toggle" | "next" | "volumeUp" | "volumeDown">;
   try {
     buttons = JSON.parse(
-      Deno.env.get("RADIO_GPIO_BUTTONS") ??
+      Deno.env.get("AIRWAVE_GPIO_BUTTONS") ??
         '{"17":"toggle","27":"next","22":"volumeUp","23":"volumeDown"}',
     );
   } catch {
-    throw new Error("RADIO_GPIO_BUTTONS must be a JSON object.");
+    throw new Error("AIRWAVE_GPIO_BUTTONS must be a JSON object.");
   }
-  const bias = Deno.env.get("RADIO_GPIO_BIAS") ?? "pull-up";
+  const bias = Deno.env.get("AIRWAVE_GPIO_BIAS") ?? "pull-up";
   if (bias !== "pull-up" && bias !== "external") {
-    throw new Error("RADIO_GPIO_BIAS must be pull-up or external.");
+    throw new Error("AIRWAVE_GPIO_BIAS must be pull-up or external.");
   }
   return new GpioInput(machine, chip, buttons, () => {
     const favorites = database.listStations().filter((station) =>
@@ -161,4 +161,4 @@ function validTarget(
   return value === "browser" || value === "appliance";
 }
 
-if (import.meta.main) await startRadioDeck();
+if (import.meta.main) await startAirwave();

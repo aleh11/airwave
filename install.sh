@@ -2,19 +2,33 @@
 
 set -Eeuo pipefail
 
-service_name="radio-deck"
-service_user="radio-deck"
-install_path="/usr/local/bin/radio-deck"
-environment_path="/etc/radio-deck.env"
-service_path="/etc/systemd/system/radio-deck.service"
+service_name="airwave"
+service_user="airwave"
+install_path="/usr/local/bin/airwave"
+environment_path="/etc/airwave.env"
+service_path="/etc/systemd/system/airwave.service"
+repository="aleh11/airwave"
+release_asset="airwave-linux-arm64"
+release_base_url="${AIRWAVE_RELEASE_BASE_URL:-https://github.com/${repository}/releases/latest/download}"
+download_dir=""
+
+cleanup() {
+  if [[ -n "${download_dir}" && -d "${download_dir}" ]]; then
+    rm -f -- "${download_dir}/${release_asset}" "${download_dir}/${release_asset}.sha256"
+    rmdir -- "${download_dir}"
+  fi
+}
+
+trap cleanup EXIT
 
 fail() {
-  printf 'Radio Deck installer: %s\n' "$1" >&2
+  printf 'Airwave installer: %s\n' "$1" >&2
   exit 1
 }
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  printf 'Usage: sudo ./install.sh [path-to-radio-linux-arm64]\n'
+  printf 'Usage: curl -fsSL https://github.com/%s/releases/latest/download/install.sh | sudo bash\n' "${repository}"
+  printf '   or: sudo ./install.sh [path-to-airwave-linux-arm64]\n'
   exit 0
 fi
 
@@ -26,14 +40,17 @@ case "$(uname -m)" in
   *) fail "the supplied binary requires 64-bit Raspberry Pi OS on ARM64" ;;
 esac
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-binary_path="${1:-${RADIO_BINARY:-}}"
+script_dir="$(pwd)"
+if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+fi
+binary_path="${1:-${AIRWAVE_BINARY:-}}"
 
 if [[ -z "${binary_path}" ]]; then
   for candidate in \
-    "${script_dir}/radio-linux-arm64" \
-    "${script_dir}/radio-deck" \
-    "${script_dir}/build/radio-linux-arm64"; do
+    "${script_dir}/airwave-linux-arm64" \
+    "${script_dir}/airwave" \
+    "${script_dir}/build/airwave-linux-arm64"; do
     if [[ -f "${candidate}" ]]; then
       binary_path="${candidate}"
       break
@@ -41,7 +58,25 @@ if [[ -z "${binary_path}" ]]; then
   done
 fi
 
-[[ -n "${binary_path}" && -f "${binary_path}" ]] || fail "place radio-linux-arm64 beside install.sh or pass its path as the first argument"
+if [[ -z "${binary_path}" ]]; then
+  command -v curl >/dev/null 2>&1 || fail "curl is required to download the latest release"
+  command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required to verify the release"
+  download_dir="$(mktemp -d)"
+  binary_path="${download_dir}/${release_asset}"
+  printf 'Downloading the latest Airwave release…\n'
+  curl --fail --silent --show-error --location --retry 3 --proto '=https' --tlsv1.2 \
+    "${release_base_url}/${release_asset}" \
+    --output "${binary_path}"
+  curl --fail --silent --show-error --location --retry 3 --proto '=https' --tlsv1.2 \
+    "${release_base_url}/${release_asset}.sha256" \
+    --output "${binary_path}.sha256"
+  (
+    cd -- "${download_dir}"
+    sha256sum --check "${release_asset}.sha256"
+  )
+fi
+
+[[ -n "${binary_path}" && -s "${binary_path}" ]] || fail "the Airwave binary is missing or empty"
 command -v apt-get >/dev/null 2>&1 || fail "apt-get is required"
 command -v systemctl >/dev/null 2>&1 || fail "systemd is required"
 
@@ -69,7 +104,7 @@ fi
 install -d -m 0750 -o "${service_user}" -g "${service_user}" "/var/lib/${service_name}"
 install -m 0755 -o root -g root "${binary_path}" "${install_path}"
 
-gpio_chip="${RADIO_GPIO_CHIP:-}"
+gpio_chip="${AIRWAVE_GPIO_CHIP:-}"
 if [[ -z "${gpio_chip}" ]] && command -v gpiodetect >/dev/null 2>&1; then
   gpio_chip="$(gpiodetect 2>/dev/null | awk '/pinctrl-(bcm|rp1)/ { sub(":", "", $1); print $1; exit }')"
 fi
@@ -77,14 +112,14 @@ fi
 if [[ ! -f "${environment_path}" ]]; then
   install -m 0640 -o root -g "${service_user}" /dev/null "${environment_path}"
   {
-    printf 'RADIO_HOST=%s\n' "${RADIO_HOST:-0.0.0.0}"
-    printf 'RADIO_PORT=%s\n' "${RADIO_PORT:-8787}"
-    printf 'RADIO_DB_PATH=%s\n' "/var/lib/${service_name}/radio.db"
-    printf 'RADIO_MPV_COMMAND=%s\n' "/usr/bin/mpv"
-    printf 'RADIO_MPV_SOCKET=%s\n' "/run/${service_name}/mpv.sock"
-    printf 'RADIO_GPIO_CHIP=%s\n' "${gpio_chip}"
-    printf 'RADIO_GPIO_BIAS=%s\n' "${RADIO_GPIO_BIAS:-pull-up}"
-    printf "RADIO_GPIO_BUTTONS='%s'\n" "${RADIO_GPIO_BUTTONS:-{\"17\":\"toggle\",\"27\":\"next\",\"22\":\"volumeUp\",\"23\":\"volumeDown\"}}"
+    printf 'AIRWAVE_HOST=%s\n' "${AIRWAVE_HOST:-0.0.0.0}"
+    printf 'AIRWAVE_PORT=%s\n' "${AIRWAVE_PORT:-8787}"
+    printf 'AIRWAVE_DB_PATH=%s\n' "/var/lib/${service_name}/airwave.db"
+    printf 'AIRWAVE_MPV_COMMAND=%s\n' "/usr/bin/mpv"
+    printf 'AIRWAVE_MPV_SOCKET=%s\n' "/run/${service_name}/mpv.sock"
+    printf 'AIRWAVE_GPIO_CHIP=%s\n' "${gpio_chip}"
+    printf 'AIRWAVE_GPIO_BIAS=%s\n' "${AIRWAVE_GPIO_BIAS:-pull-up}"
+    printf "AIRWAVE_GPIO_BUTTONS='%s'\n" "${AIRWAVE_GPIO_BUTTONS:-{\"17\":\"toggle\",\"27\":\"next\",\"22\":\"volumeUp\",\"23\":\"volumeDown\"}}"
   } > "${environment_path}"
 else
   printf 'Keeping existing %s\n' "${environment_path}"
@@ -92,19 +127,19 @@ fi
 
 cat > "${service_path}" <<'UNIT'
 [Unit]
-Description=Radio Deck internet radio
+Description=Airwave internet radio
 Wants=network-online.target
 After=network-online.target sound.target
 
 [Service]
 Type=simple
-User=radio-deck
-Group=radio-deck
+User=airwave
+Group=airwave
 SupplementaryGroups=audio gpio
-EnvironmentFile=/etc/radio-deck.env
-RuntimeDirectory=radio-deck
-StateDirectory=radio-deck
-ExecStart=/usr/local/bin/radio-deck
+EnvironmentFile=/etc/airwave.env
+RuntimeDirectory=airwave
+StateDirectory=airwave
+ExecStart=/usr/local/bin/airwave
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -138,10 +173,10 @@ fi
 
 dashboard_host="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
 dashboard_host="${dashboard_host:-$(hostname).local}"
-dashboard_port="$(awk -F= '$1 == "RADIO_PORT" { gsub(/[^0-9]/, "", $2); print $2; exit }' "${environment_path}")"
+dashboard_port="$(awk -F= '$1 == "AIRWAVE_PORT" { gsub(/[^0-9]/, "", $2); print $2; exit }' "${environment_path}")"
 dashboard_port="${dashboard_port:-8787}"
 
-printf '\nRadio Deck is installed and running.\n'
+printf '\nAirwave is installed and running.\n'
 printf 'Open http://%s:%s\n' "${dashboard_host}" "${dashboard_port}"
 printf 'Configuration: %s\n' "${environment_path}"
 printf 'Logs: journalctl -u %s -f\n' "${service_name}"

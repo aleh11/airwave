@@ -34,7 +34,7 @@ export class RadioBrowserClient {
     if (query.tag) params.set("tag", query.tag);
     if (query.country) params.set("countrycode", query.country.toUpperCase());
     const response = await fetch(`${server}/json/stations/search?${params}`, {
-      headers: { "User-Agent": "RadioDeck/1.0" },
+      headers: { "User-Agent": "Airwave/1.0" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
@@ -65,7 +65,7 @@ export class RadioBrowserClient {
       const response = await fetch(
         "https://all.api.radio-browser.info/json/servers",
         {
-          headers: { "User-Agent": "RadioDeck/1.0" },
+          headers: { "User-Agent": "Airwave/1.0" },
           signal: AbortSignal.timeout(5_000),
         },
       );

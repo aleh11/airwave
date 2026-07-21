@@ -77,25 +77,25 @@ const navItems: Array<{ view: View; label: string; icon: typeof Radio }> = [
 
 export default function App() {
   const [themeName, setThemeName] = useState<ThemeName>(() =>
-    readSetting("radio-deck-theme") === "neutral"
+    readSetting("airwave-theme") === "neutral"
       ? "neutral"
-      : readSetting("radio-deck-theme") === "y2k"
+      : readSetting("airwave-theme") === "y2k"
       ? "y2k"
       : "stone"
   );
   const [mode, setMode] = useState<ColorMode>(() =>
-    readSetting("radio-deck-mode") === "dark" ? "dark" : "light"
+    readSetting("airwave-mode") === "dark" ? "dark" : "light"
   );
 
-  useEffect(() => localStorage.setItem("radio-deck-theme", themeName), [
+  useEffect(() => localStorage.setItem("airwave-theme", themeName), [
     themeName,
   ]);
-  useEffect(() => localStorage.setItem("radio-deck-mode", mode), [mode]);
+  useEffect(() => localStorage.setItem("airwave-mode", mode), [mode]);
 
   return (
     <Theme theme={themeMap[themeName]} mode={mode}>
       <ToastViewport position="bottomEnd" maxVisible={3}>
-        <RadioDeck
+        <Airwave
           themeName={themeName}
           mode={mode}
           setThemeName={setThemeName}
@@ -106,7 +106,7 @@ export default function App() {
   );
 }
 
-function RadioDeck({ themeName, mode, setThemeName, setMode }: {
+function Airwave({ themeName, mode, setThemeName, setMode }: {
   themeName: ThemeName;
   mode: ColorMode;
   setThemeName: (theme: ThemeName) => void;
@@ -243,7 +243,7 @@ function RadioDeck({ themeName, mode, setThemeName, setMode }: {
     <SideNav
       header={
         <SideNavHeading
-          heading="Radio Deck"
+          heading="Airwave"
           superheading="Pi receiver"
           icon={<Icon icon={Radio} color="accent" />}
         />
@@ -288,13 +288,13 @@ function RadioDeck({ themeName, mode, setThemeName, setMode }: {
 
   const topNavigation = (
     <TopNav
-      label="Radio Deck navigation"
+      label="Airwave navigation"
       heading={
         <TopNavHeading
-          heading="Radio Deck"
+          heading="Airwave"
           subheading={connected ? "Receiver online" : "Reconnecting"}
           logo={<Icon icon={Radio} color="accent" />}
-          logoLabel="Radio Deck"
+          logoLabel="Airwave"
           headerEndContent={
             <StatusDot
               variant={connected ? "success" : "warning"}

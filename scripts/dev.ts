@@ -3,7 +3,7 @@ const cwd = Deno.cwd();
 const server = new Deno.Command(Deno.execPath(), {
   args: ["task", "dev:server"],
   cwd,
-  env: { ...Deno.env.toObject(), RADIO_WEB_DEV_URL: "http://localhost:5173" },
+  env: { ...Deno.env.toObject(), AIRWAVE_WEB_DEV_URL: "http://localhost:5173" },
   stdin: "inherit",
   stdout: "inherit",
   stderr: "inherit",

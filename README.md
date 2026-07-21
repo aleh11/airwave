@@ -1,10 +1,10 @@
-# Radio Deck
+# Airwave
 
-Radio Deck is a self-hosted internet radio dashboard for a browser or Raspberry
-Pi. One Deno process owns the radio state, SQLite library, discovery API,
-metadata stream, timers, WebSocket clients, optional `mpv` output, and optional
-GPIO controls. The React interface is embedded into the compiled executable, so
-the Pi receives one binary and no JavaScript runtime.
+Airwave is a self-hosted internet radio dashboard for a browser or Raspberry Pi.
+One Deno process owns the radio state, SQLite library, discovery API, metadata
+stream, timers, WebSocket clients, optional `mpv` output, and optional GPIO
+controls. The React interface is embedded into the compiled executable, so the
+Pi receives one binary and no JavaScript runtime.
 
 ## What is included
 
@@ -53,7 +53,7 @@ deno task dev
 Open [http://localhost:8787](http://localhost:8787). The backend proxies the
 Vite page in development, while Vite's HMR connection stays on port 5173.
 
-The SQLite database is created at `./data/radio.db`. The server binds to
+The SQLite database is created at `./data/airwave.db`. The server binds to
 `127.0.0.1` by default.
 
 ## Verify
@@ -78,7 +78,7 @@ Build a binary for the current machine:
 
 ```bash
 deno task compile:local
-./build/radio
+./build/airwave
 ```
 
 Cross-compile the Raspberry Pi binary on the development machine:
@@ -87,39 +87,61 @@ Cross-compile the Raspberry Pi binary on the development machine:
 deno task compile
 ```
 
-The result is `build/radio-linux-arm64`. Network, environment, file, and
+The result is `build/airwave-linux-arm64`. Network, environment, file, and
 subprocess permissions are embedded in the executable. The frontend build under
 `web/dist` is included in the binary.
 
 ## Configuration
 
-| Variable             | Default                    | Purpose                                   |
-| -------------------- | -------------------------- | ----------------------------------------- |
-| `RADIO_HOST`         | `127.0.0.1`                | HTTP bind address                         |
-| `RADIO_PORT`         | `8787`                     | HTTP port                                 |
-| `RADIO_DB_PATH`      | `./data/radio.db`          | SQLite database path                      |
-| `RADIO_WEB_ROOT`     | `./web/dist`               | Embedded/static frontend path             |
-| `RADIO_MPV_COMMAND`  | `mpv`                      | `mpv` executable path                     |
-| `RADIO_MPV_SOCKET`   | `/tmp/radio-deck-mpv.sock` | `mpv` IPC socket                          |
-| `RADIO_GPIO_CHIP`    | unset                      | GPIO chip; leaving it unset disables GPIO |
-| `RADIO_GPIO_BIAS`    | `pull-up`                  | `pull-up` or `external`                   |
-| `RADIO_GPIO_BUTTONS` | standard four-button map   | JSON map from line offsets to actions     |
+| Variable               | Default                  | Purpose                                   |
+| ---------------------- | ------------------------ | ----------------------------------------- |
+| `AIRWAVE_HOST`         | `127.0.0.1`              | HTTP bind address                         |
+| `AIRWAVE_PORT`         | `8787`                   | HTTP port                                 |
+| `AIRWAVE_DB_PATH`      | `./data/airwave.db`      | SQLite database path                      |
+| `AIRWAVE_WEB_ROOT`     | `./web/dist`             | Embedded/static frontend path             |
+| `AIRWAVE_MPV_COMMAND`  | `mpv`                    | `mpv` executable path                     |
+| `AIRWAVE_MPV_SOCKET`   | `/tmp/airwave-mpv.sock`  | `mpv` IPC socket                          |
+| `AIRWAVE_GPIO_CHIP`    | unset                    | GPIO chip; leaving it unset disables GPIO |
+| `AIRWAVE_GPIO_BIAS`    | `pull-up`                | `pull-up` or `external`                   |
+| `AIRWAVE_GPIO_BUTTONS` | standard four-button map | JSON map from line offsets to actions     |
 
 Supported GPIO actions are `toggle`, `next`, `volumeUp`, and `volumeDown`. Run
-`gpiodetect` on the Pi before setting `RADIO_GPIO_CHIP`; Pi models and kernels
-expose different chip names. Radio Deck checks the installed `gpiomon` major
+`gpiodetect` on the Pi before setting `AIRWAVE_GPIO_CHIP`; Pi models and kernels
+expose different chip names. Airwave checks the installed `gpiomon` major
 version and uses the matching 1.x or 2.x flags.
 
 Older `gpiomon` releases that cannot request internal bias are rejected when
-`RADIO_GPIO_BIAS=pull-up`. Upgrade `gpiod`, or wire external pull-up resistors
-and set `RADIO_GPIO_BIAS=external`.
+`AIRWAVE_GPIO_BIAS=pull-up`. Upgrade `gpiod`, or wire external pull-up resistors
+and set `AIRWAVE_GPIO_BIAS=external`.
 
 ## Raspberry Pi deployment
 
-Copy the ARM64 binary and installer to the Pi:
+After a release has been published, install the latest version on a 64-bit
+Raspberry Pi with one command:
 
 ```bash
-scp build/radio-linux-arm64 install.sh pi@raspberrypi.local:~/
+curl -fsSL https://github.com/aleh11/airwave/releases/latest/download/install.sh | sudo bash
+```
+
+The installer downloads the latest ARM64 binary and its SHA-256 checksum,
+verifies it, installs system dependencies, configures the systemd service, and
+prints the dashboard URL.
+
+To publish a release, push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow verifies the project, cross-compiles the Pi binary, and
+attaches the binary, checksum, and installer to the GitHub Release.
+
+For a manual/offline installation, copy the ARM64 binary and installer to the
+Pi:
+
+```bash
+scp build/airwave-linux-arm64 install.sh pi@raspberrypi.local:~/
 ```
 
 Then run one setup command on the Pi:
@@ -128,19 +150,17 @@ Then run one setup command on the Pi:
 sudo ./install.sh
 ```
 
-The installer adds `mpv` and `gpiod`, creates the locked-down service account,
-detects the Pi GPIO chip when possible, installs the binary and systemd unit,
-starts Radio Deck, and prints its dashboard URL. It is safe to run again for an
-upgrade and preserves an existing `/etc/radio-deck.env`.
+It is safe to run the installer again for an upgrade and it preserves an
+existing `/etc/airwave.env`.
 
 The binary may also be passed explicitly:
 
 ```bash
-sudo ./install.sh /path/to/radio-linux-arm64
+sudo ./install.sh /path/to/airwave-linux-arm64
 ```
 
-Edit `/etc/radio-deck.env` if the detected GPIO chip or button lines need to be
-changed, then run `sudo systemctl restart radio-deck`.
+Edit `/etc/airwave.env` if the detected GPIO chip or button lines need to be
+changed, then run `sudo systemctl restart airwave`.
 
 ## GPIO wiring
 
@@ -156,6 +176,6 @@ Wire each momentary button between its configured GPIO line and ground.
 
 ## Security boundary
 
-Radio Deck has no user accounts. It binds to loopback by default; setting
-`RADIO_HOST=0.0.0.0` makes it available to the local network. Do not expose it
+Airwave has no user accounts. It binds to loopback by default; setting
+`AIRWAVE_HOST=0.0.0.0` makes it available to the local network. Do not expose it
 directly to the public internet without an authenticated reverse proxy and TLS.

@@ -30,8 +30,8 @@
     "build": "deno run -A npm:vite@8.1.5 build web",
     "check": "deno fmt --check && deno lint && deno check backend/main.ts web/src/main.tsx",
     "test": "deno test -A",
-    "compile": "deno task build && deno compile --target aarch64-unknown-linux-gnu --include web/dist --allow-env --allow-net --allow-read --allow-run --allow-write -o build/radio-linux-arm64 backend/main.ts",
-    "compile:local": "deno task build && deno compile --include web/dist --allow-env --allow-net --allow-read --allow-run --allow-write -o build/radio backend/main.ts"
+    "compile": "deno task build && deno compile --target aarch64-unknown-linux-gnu --include web/dist --allow-env --allow-net --allow-read --allow-run --allow-write -o build/airwave-linux-arm64 backend/main.ts",
+    "compile:local": "deno task build && deno compile --include web/dist --allow-env --allow-net --allow-read --allow-run --allow-write -o build/airwave backend/main.ts"
   },
   "exclude": ["build", "data", "node_modules", "web/dist"]
 }

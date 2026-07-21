@@ -1,17 +1,17 @@
 [Unit]
-Description=Radio Deck internet radio
+Description=Airwave internet radio
 Wants=network-online.target
 After=network-online.target sound.target
 
 [Service]
 Type=simple
-User=radio-deck
-Group=radio-deck
+User=airwave
+Group=airwave
 SupplementaryGroups=audio gpio
-EnvironmentFile=/etc/radio-deck.env
-RuntimeDirectory=radio-deck
-StateDirectory=radio-deck
-ExecStart=/usr/local/bin/radio-deck
+EnvironmentFile=/etc/airwave.env
+RuntimeDirectory=airwave
+StateDirectory=airwave
+ExecStart=/usr/local/bin/airwave
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

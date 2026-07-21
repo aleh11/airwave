@@ -13,7 +13,7 @@ export class MpvOutput {
   constructor(
     machine: RadioStateMachine,
     command = "mpv",
-    socketPath = "/tmp/radio-deck-mpv.sock",
+    socketPath = "/tmp/airwave-mpv.sock",
   ) {
     this.#machine = machine;
     this.#command = command;
@@ -92,7 +92,7 @@ export class MpvOutput {
       args: [
         "--no-video",
         "--idle=yes",
-        "--audio-client-name=Radio Deck",
+        "--audio-client-name=Airwave",
         `--input-ipc-server=${this.#socketPath}`,
       ],
       stdin: "null",
