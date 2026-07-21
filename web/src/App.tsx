@@ -47,6 +47,10 @@ import {
   updateStation,
 } from "./api.ts";
 import { StationEditor } from "./components/StationEditor.tsx";
+import {
+  UpdateDialog,
+  type UpdateDialogModel,
+} from "./components/UpdateDialog.tsx";
 import { useRadioSocket } from "./hooks/useRadioSocket.ts";
 import { RaspberryMark } from "./icons.tsx";
 import {
@@ -55,7 +59,12 @@ import {
   type PaletteName,
   paletteOptions,
 } from "./theme.ts";
-import type { PlaybackTarget, Station, VersionInfo } from "./types.ts";
+import type {
+  PlaybackTarget,
+  Station,
+  UpdateStatus,
+  VersionInfo,
+} from "./types.ts";
 import { errorMessage, type Notify, ReceiverLoading } from "./ui.tsx";
 import { DiscoverView } from "./views/DiscoverView.tsx";
 import { AudioView } from "./views/AudioView.tsx";
@@ -115,6 +124,9 @@ function Airwave({ palette, mode, setPalette, setMode }: {
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [updateDialog, setUpdateDialog] = useState<UpdateDialogModel | null>(
+    null,
+  );
   const audioRef = useRef<HTMLAudioElement>(null);
   const showToast = useToast();
   const notify = useCallback<Notify>((message, kind = "info") => {
@@ -237,49 +249,47 @@ function Airwave({ palette, mode, setPalette, setMode }: {
     [notify, refreshStations],
   );
 
-  const installUpdate = useCallback(async (latest: string) => {
+  const installUpdate = useCallback(async () => {
+    if (!updateDialog) return;
+    const latest = updateDialog.latestVersion;
     setUpdating(true);
-    showToast({
-      uniqueID: "airwave-update",
-      collisionBehavior: "overwrite",
-      body: `Updating Airwave to v${latest}…`,
-      type: "info",
-      isAutoHide: false,
-      endContent: (
-        <Button
-          label="Updating"
-          variant="primary"
-          size="sm"
-          icon={<Icon icon={Download} size="sm" />}
-          isLoading
-        />
-      ),
-    });
+    setUpdateDialog((current) =>
+      current
+        ? { ...current, phase: "requested", message: "Preparing update." }
+        : current
+    );
     try {
       const update = await beginUpdate();
+      setUpdateDialog((current) =>
+        current
+          ? { ...current, phase: update.state, message: update.message }
+          : current
+      );
       if (update.state !== "complete") {
-        await waitForUpdate(latest);
+        await waitForUpdate(
+          latest,
+          (status) =>
+            setUpdateDialog((current) =>
+              current
+                ? { ...current, phase: status.state, message: status.message }
+                : current
+            ),
+        );
       }
-      showToast({
-        uniqueID: "airwave-update",
-        collisionBehavior: "overwrite",
-        body: `Airwave v${latest} installed. Reconnecting…`,
-        type: "info",
-        isAutoHide: false,
-      });
+      setUpdateDialog((current) =>
+        current ? { ...current, phase: "complete", message: null } : current
+      );
       globalThis.setTimeout(() => globalThis.location.reload(), 900);
     } catch (error) {
-      showToast({
-        uniqueID: "airwave-update",
-        collisionBehavior: "overwrite",
-        body: errorMessage(error),
-        type: "error",
-        isAutoHide: false,
-      });
+      setUpdateDialog((current) =>
+        current
+          ? { ...current, phase: "failed", message: errorMessage(error) }
+          : current
+      );
     } finally {
       setUpdating(false);
     }
-  }, [showToast]);
+  }, [updateDialog]);
 
   const checkUpdates = useCallback(async () => {
     setCheckingUpdates(true);
@@ -288,7 +298,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
       setVersion(nextVersion);
       const latest = nextVersion.latest;
       if (nextVersion.updateAvailable && latest) {
-        showToast({
+        const dismissUpdateToast = showToast({
           uniqueID: "airwave-update",
           collisionBehavior: "overwrite",
           body: `Airwave v${latest} is available.`,
@@ -300,7 +310,15 @@ function Airwave({ palette, mode, setPalette, setMode }: {
               variant="primary"
               size="sm"
               icon={<Icon icon={Download} size="sm" />}
-              clickAction={() => installUpdate(latest)}
+              clickAction={() => {
+                dismissUpdateToast();
+                setUpdateDialog({
+                  currentVersion: nextVersion.current,
+                  latestVersion: latest,
+                  phase: "confirm",
+                  message: null,
+                });
+              }}
             />
           ),
         });
@@ -312,7 +330,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
     } finally {
       setCheckingUpdates(false);
     }
-  }, [installUpdate, notify, showToast]);
+  }, [notify, showToast]);
 
   const navigation = (
     <SideNav
@@ -495,16 +513,26 @@ function Airwave({ palette, mode, setPalette, setMode }: {
         isActionLoading={deleting}
         onAction={deleteStation}
       />
+      <UpdateDialog
+        model={updateDialog}
+        onClose={() => setUpdateDialog(null)}
+        onConfirm={installUpdate}
+        onRetry={installUpdate}
+      />
     </>
   );
 }
 
-async function waitForUpdate(version: string): Promise<void> {
+async function waitForUpdate(
+  version: string,
+  onStatus: (status: UpdateStatus) => void,
+): Promise<void> {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     await new Promise((resolve) => globalThis.setTimeout(resolve, 1_500));
     try {
       const status = await getUpdateStatus();
+      onStatus(status);
       if (status.state === "complete" && status.version === version) return;
       if (status.state === "failed") {
         throw new Error(status.message || "The update could not be installed.");
