@@ -139,8 +139,9 @@ clear_live_progress() {
 }
 
 run_step() {
-  local label="$1"
-  shift
+  local active_label="$1"
+  local completed_label="$2"
+  shift 2
   local frames=('◐' '◓' '◑' '◒')
   local frame=0
   local status=0
@@ -150,22 +151,22 @@ run_step() {
     "$@" >"${status_log}" 2>&1 &
     local command_pid=$!
     while kill -0 "${command_pid}" 2>/dev/null; do
-      render_status "${frames[frame]}" "${label}"
+      render_status "${frames[frame]}" "${active_label}"
       frame=$(((frame + 1) % ${#frames[@]}))
       sleep 0.12
     done
     if wait "${command_pid}"; then status=0; else status=$?; fi
   else
-    printf '  ... %s\n' "${label}"
+    printf '  ... %s\n' "${active_label}"
     if "$@" >"${status_log}" 2>&1; then status=0; else status=$?; fi
   fi
 
   if [[ "${status}" -ne 0 ]]; then
     clear_live_progress
     cat "${status_log}" >&2
-    fail "${label} failed"
+    fail "${active_label} failed"
   fi
-  complete_step "${label}"
+  complete_step "${completed_label}"
 }
 
 download_release() {
@@ -191,8 +192,18 @@ verify_release() {
 install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y --no-install-recommends \
-    mpv gpiod ca-certificates bluez bluez-alsa-utils rfkill
+  apt-get install -y --no-install-recommends "$@"
+}
+
+find_missing_packages() {
+  local package
+  missing_packages=()
+  for package in mpv gpiod ca-certificates bluez bluez-alsa-utils rfkill; do
+    if ! dpkg-query -W -f='${Status}' "${package}" 2>/dev/null | \
+      grep -q '^install ok installed$'; then
+      missing_packages+=("${package}")
+    fi
+  done
 }
 
 prepare_service_account() {
@@ -445,22 +456,43 @@ if [[ -z "${binary_path}" ]]; then
   download_dir="$(mktemp -d)"
   binary_path="${download_dir}/${release_asset}"
   downloaded_release=true
-  run_step "Downloaded the latest Airwave release" download_release
+  run_step \
+    "Downloading the latest Airwave release" \
+    "Downloaded the latest Airwave release" \
+    download_release
 else
   complete_step "Found the Airwave binary"
 fi
 
-run_step "Verified release integrity" verify_release
-run_step "Installed audio, Bluetooth, and GPIO packages" install_packages
-run_step "Prepared the restricted service account" prepare_service_account
+run_step \
+  "Verifying release integrity" \
+  "Verified release integrity" \
+  verify_release
+missing_packages=()
+find_missing_packages
+if [[ "${#missing_packages[@]}" -eq 0 ]]; then
+  complete_step "Audio, Bluetooth, and GPIO packages already installed"
+else
+  run_step \
+    "Installing missing audio, Bluetooth, and GPIO packages" \
+    "Installed required audio, Bluetooth, and GPIO packages" \
+    install_packages "${missing_packages[@]}"
+fi
+run_step \
+  "Preparing the restricted service account" \
+  "Prepared the restricted service account" \
+  prepare_service_account
 
 gpio_chip="${AIRWAVE_GPIO_CHIP:-}"
 if [[ -z "${gpio_chip}" ]] && command -v gpiodetect >/dev/null 2>&1; then
   gpio_chip="$(gpiodetect 2>/dev/null | awk '/pinctrl-(bcm|rp1)/ { sub(":", "", $1); print $1; exit }')"
 fi
 
-run_step "Installed Airwave and its system service" install_service_files
-run_step "Started Airwave" start_airwave
+run_step \
+  "Installing Airwave and its system service" \
+  "Installed Airwave and its system service" \
+  install_service_files
+run_step "Starting Airwave" "Started Airwave" start_airwave
 
 dashboard_host="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
 dashboard_host="${dashboard_host:-$(hostname).local}"

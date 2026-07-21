@@ -1,5 +1,6 @@
 import type {
   BluetoothAudioStatus,
+  BluetoothDiagnostics,
   DiscoveryStation,
   ListeningStats,
   Station,
@@ -97,6 +98,10 @@ export async function getAudioStatus(
   return await request<BluetoothAudioStatus>(
     `/api/audio?audioOnly=${audioOnly}`,
   );
+}
+
+export async function getAudioDiagnostics(): Promise<BluetoothDiagnostics> {
+  return await request<BluetoothDiagnostics>("/api/audio/diagnostics");
 }
 
 export async function scanAudioDevices(

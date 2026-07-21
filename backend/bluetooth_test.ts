@@ -165,6 +165,10 @@ Deno.test("Bluetooth manager retries transient controller power failures", async
   const status = await manager.scan(3, true);
   assertEquals(powerAttempts, 3);
   assertEquals(status.powered, true);
+  const diagnostics = await manager.getDiagnostics();
+  assertEquals(diagnostics.lastPower?.state, "success");
+  assertEquals(diagnostics.lastPower?.attempts, 3);
+  assertEquals(diagnostics.lastScan?.state, "success");
 });
 
 Deno.test("Bluetooth manager explains a persistent power failure", async () => {
@@ -191,6 +195,41 @@ Deno.test("Bluetooth manager explains a persistent power failure", async () => {
     "could not power on after 3 attempts",
   );
   assertEquals(powerAttempts, 3);
+  const diagnostics = await manager.getDiagnostics();
+  assertEquals(diagnostics.lastPower?.state, "error");
+  assertEquals(diagnostics.lastScan?.state, "error");
+  assertEquals(
+    diagnostics.lastScan?.error?.includes("could not power on"),
+    true,
+  );
+});
+
+Deno.test("Bluetooth manager captures discovery command failures", async () => {
+  const manager = new BluetoothManager({
+    runner: (args) => {
+      if (args[0] === "show") {
+        return Promise.resolve(result(`Controller 00:11:22:33:44:55 airwave
+  Name: airwave
+  Alias: airwave
+  Powered: yes`));
+      }
+      return Promise.resolve(
+        result("Failed to start discovery: org.bluez.Error.InProgress"),
+      );
+    },
+  });
+
+  await assertRejects(
+    () => manager.scan(3),
+    BluetoothError,
+    "Failed to start discovery",
+  );
+  const diagnostics = await manager.getDiagnostics();
+  assertEquals(diagnostics.lastScan?.state, "error");
+  assertEquals(
+    diagnostics.lastScan?.output,
+    "Failed to start discovery: org.bluez.Error.InProgress",
+  );
 });
 
 function result(

@@ -112,6 +112,11 @@ export function createApiHandler(
           ),
         );
       }
+      if (
+        url.pathname === "/api/audio/diagnostics" && request.method === "GET"
+      ) {
+        return json(await bluetooth.getDiagnostics());
+      }
       if (url.pathname === "/api/audio/scan" && request.method === "POST") {
         const input = asObject(await readOptionalJson(request));
         const seconds = input.seconds === undefined

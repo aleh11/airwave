@@ -1,6 +1,8 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
@@ -8,16 +10,23 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Item } from "@astryxdesign/core/Item";
 import { List } from "@astryxdesign/core/List";
+import {
+  MetadataList,
+  MetadataListItem,
+} from "@astryxdesign/core/MetadataList";
 import { Section } from "@astryxdesign/core/Section";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import {
   ArrowRight,
   Bluetooth,
   BluetoothSearching,
+  Bug,
   Headphones,
+  ListFilter,
   Plug,
   RadioTower,
   RefreshCw,
@@ -30,37 +39,56 @@ import {
   connectAudioDevice,
   disconnectAudioDevice,
   forgetAudioDevice,
+  getAudioDiagnostics,
   getAudioStatus,
   pairAudioDevice,
   scanAudioDevices,
   selectAudioOutput,
 } from "../api.ts";
 import { RaspberryMark } from "../icons.tsx";
-import type { BluetoothAudioStatus, BluetoothDevice } from "../types.ts";
+import type {
+  BluetoothAudioStatus,
+  BluetoothDevice,
+  BluetoothDiagnostics,
+} from "../types.ts";
 import { errorMessage, type Notify, PageFrame } from "../ui.tsx";
 
 export function AudioView({ notify }: { notify: Notify }) {
   const [status, setStatus] = useState<BluetoothAudioStatus | null>(null);
+  const [diagnostics, setDiagnostics] = useState<BluetoothDiagnostics | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
+  const [showAllDevices, setShowAllDevices] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
+  const [lastAction, setLastAction] = useState<DiagnosticAction | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [pendingForget, setPendingForget] = useState<BluetoothDevice | null>(
     null,
   );
   const [forgetting, setForgetting] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const loadDiagnostics = useCallback(async (notifyOnError: boolean) => {
+    const startedAt = performance.now();
     try {
-      setStatus(await getAudioStatus());
+      const next = await getAudioDiagnostics();
+      setDiagnostics(next);
+      setStatus(next.status);
+      setApiLatencyMs(Math.round(performance.now() - startedAt));
+      setApiError(null);
     } catch (error) {
-      notify(errorMessage(error), "error");
+      const message = errorMessage(error);
+      setApiError(message);
+      if (notifyOnError) notify(message, "error");
     } finally {
       setLoading(false);
     }
   }, [notify]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    loadDiagnostics(false);
+  }, [loadDiagnostics]);
 
   const selectedDevice = useMemo(
     () =>
@@ -70,26 +98,52 @@ export function AudioView({ notify }: { notify: Notify }) {
     [status],
   );
 
+  const audioDevices = useMemo(
+    () => status?.devices.filter((device) => device.audioCapable) ?? [],
+    [status],
+  );
+  const visibleDevices = showAllDevices ? status?.devices ?? [] : audioDevices;
+
   const runAction = useCallback(async (
     key: string,
     action: () => Promise<BluetoothAudioStatus>,
     message: string,
   ) => {
     setPendingAction(key);
+    setLastAction({
+      name: diagnosticActionName(key),
+      state: "running",
+      completedAt: null,
+      error: null,
+    });
     try {
       setStatus(await action());
+      setLastAction({
+        name: diagnosticActionName(key),
+        state: "success",
+        completedAt: new Date().toISOString(),
+        error: null,
+      });
       notify(message);
     } catch (error) {
-      notify(errorMessage(error), "error");
+      const message = errorMessage(error);
+      setLastAction({
+        name: diagnosticActionName(key),
+        state: "error",
+        completedAt: new Date().toISOString(),
+        error: message,
+      });
+      notify(message, "error");
     } finally {
+      await loadDiagnostics(false);
       setPendingAction(null);
     }
-  }, [notify]);
+  }, [loadDiagnostics, notify]);
 
   const scan = () =>
     runAction(
       "scan",
-      () => scanAudioDevices(),
+      () => scanAudioDevices(12, false),
       "Bluetooth scan complete.",
     );
 
@@ -127,13 +181,33 @@ export function AudioView({ notify }: { notify: Notify }) {
   const forget = async () => {
     if (!pendingForget) return;
     setForgetting(true);
+    setLastAction({
+      name: "Forget device",
+      state: "running",
+      completedAt: null,
+      error: null,
+    });
     try {
       setStatus(await forgetAudioDevice(pendingForget.address));
       notify(`${pendingForget.alias} forgotten.`);
+      setLastAction({
+        name: "Forget device",
+        state: "success",
+        completedAt: new Date().toISOString(),
+        error: null,
+      });
       setPendingForget(null);
     } catch (error) {
-      notify(errorMessage(error), "error");
+      const message = errorMessage(error);
+      setLastAction({
+        name: "Forget device",
+        state: "error",
+        completedAt: new Date().toISOString(),
+        error: message,
+      });
+      notify(message, "error");
     } finally {
+      await loadDiagnostics(false);
       setForgetting(false);
     }
   };
@@ -147,6 +221,22 @@ export function AudioView({ notify }: { notify: Notify }) {
         title="Audio"
         description="Pair a Bluetooth speaker or headphones, then choose where the Pi plays."
       >
+        {!loading && apiError && (
+          <Banner
+            status="error"
+            title="Bluetooth API check failed"
+            description={apiError}
+            endContent={
+              <Button
+                label="Retry API check"
+                variant="ghost"
+                size="sm"
+                icon={<Icon icon={RefreshCw} size="sm" />}
+                clickAction={() => loadDiagnostics(true)}
+              />
+            }
+          />
+        )}
         {!loading && status && !status.available && (
           <Banner
             status="error"
@@ -159,7 +249,7 @@ export function AudioView({ notify }: { notify: Notify }) {
                 variant="ghost"
                 size="sm"
                 icon={<Icon icon={RefreshCw} size="sm" />}
-                clickAction={refresh}
+                clickAction={() => loadDiagnostics(true)}
               />
             }
           />
@@ -195,7 +285,7 @@ export function AudioView({ notify }: { notify: Notify }) {
                   scanning.
                 </Text>
               </VStack>
-              <HStack gap={2} vAlign="center">
+              <HStack gap={2} vAlign="center" wrap="wrap">
                 <IconButton
                   label="Refresh Bluetooth devices"
                   tooltip="Refresh devices"
@@ -206,9 +296,14 @@ export function AudioView({ notify }: { notify: Notify }) {
                   clickAction={() =>
                     runAction(
                       "refresh",
-                      () => getAudioStatus(),
+                      () => getAudioStatus(false),
                       "Bluetooth devices refreshed.",
                     )}
+                />
+                <Switch
+                  label="Show all devices"
+                  value={showAllDevices}
+                  onChange={setShowAllDevices}
                 />
                 <Button
                   label="Scan for devices"
@@ -222,7 +317,8 @@ export function AudioView({ notify }: { notify: Notify }) {
             </HStack>
             <DeviceList
               loading={loading}
-              devices={status?.devices ?? []}
+              devices={visibleDevices}
+              showAllDevices={showAllDevices}
               selectedAddress={status?.selectedDeviceAddress ?? null}
               pendingAction={pendingAction}
               busy={busy}
@@ -233,6 +329,23 @@ export function AudioView({ notify }: { notify: Notify }) {
             />
           </VStack>
         </Section>
+        <DiagnosticsPanel
+          diagnostics={diagnostics}
+          apiError={apiError}
+          apiLatencyMs={apiLatencyMs}
+          loading={loading}
+          lastAction={lastAction}
+          totalDevices={status?.devices.length ?? 0}
+          audioDevices={audioDevices.length}
+          isRefreshing={pendingAction === "refresh"}
+          isBusy={busy}
+          onRefresh={() =>
+            runAction(
+              "refresh",
+              () => getAudioStatus(false),
+              "Bluetooth diagnostics refreshed.",
+            )}
+        />
       </PageFrame>
       <AlertDialog
         isOpen={Boolean(pendingForget)}
@@ -246,6 +359,249 @@ export function AudioView({ notify }: { notify: Notify }) {
         onAction={forget}
       />
     </>
+  );
+}
+
+interface DiagnosticAction {
+  name: string;
+  state: "running" | "success" | "error";
+  completedAt: string | null;
+  error: string | null;
+}
+
+type DiagnosticVariant =
+  | "success"
+  | "warning"
+  | "error"
+  | "accent"
+  | "neutral";
+
+interface DiagnosticStep {
+  label: string;
+  detail: string;
+  variant: DiagnosticVariant;
+  pulsing?: boolean;
+}
+
+function DiagnosticsPanel({
+  diagnostics,
+  apiError,
+  apiLatencyMs,
+  loading,
+  lastAction,
+  totalDevices,
+  audioDevices,
+  isRefreshing,
+  isBusy,
+  onRefresh,
+}: {
+  diagnostics: BluetoothDiagnostics | null;
+  apiError: string | null;
+  apiLatencyMs: number | null;
+  loading: boolean;
+  lastAction: DiagnosticAction | null;
+  totalDevices: number;
+  audioDevices: number;
+  isRefreshing: boolean;
+  isBusy: boolean;
+  onRefresh: () => void;
+}) {
+  const bluetoothStatus = diagnostics?.status;
+  const lastPower = diagnostics?.lastPower;
+  const lastScan = diagnostics?.lastScan;
+  const steps: DiagnosticStep[] = [
+    loading
+      ? {
+        label: "Airwave API",
+        detail: "Checking endpoint",
+        variant: "accent",
+        pulsing: true,
+      }
+      : apiError
+      ? { label: "Airwave API", detail: apiError, variant: "error" }
+      : {
+        label: "Airwave API",
+        detail: apiLatencyMs === null ? "Responding" : `${apiLatencyMs} ms`,
+        variant: "success",
+      },
+    !bluetoothStatus
+      ? { label: "BlueZ", detail: "No result", variant: "neutral" }
+      : bluetoothStatus.available
+      ? {
+        label: "BlueZ",
+        detail: bluetoothStatus.adapterName || "Controller found",
+        variant: "success",
+      }
+      : {
+        label: "BlueZ",
+        detail: bluetoothStatus.error || "Controller unavailable",
+        variant: "error",
+      },
+    !bluetoothStatus?.available
+      ? { label: "Controller", detail: "Waiting for BlueZ", variant: "neutral" }
+      : bluetoothStatus.powered
+      ? { label: "Controller", detail: "Powered on", variant: "success" }
+      : lastPower?.state === "error"
+      ? {
+        label: "Controller",
+        detail: lastPower.error || "Power failed",
+        variant: "error",
+      }
+      : { label: "Controller", detail: "Powered off", variant: "warning" },
+    !lastScan
+      ? { label: "Discovery", detail: "Not run yet", variant: "neutral" }
+      : lastScan.state === "running"
+      ? {
+        label: "Discovery",
+        detail: "Scanning nearby devices",
+        variant: "accent",
+        pulsing: true,
+      }
+      : lastScan.state === "success"
+      ? {
+        label: "Discovery",
+        detail: formatDuration(lastScan.durationMs),
+        variant: "success",
+      }
+      : {
+        label: "Discovery",
+        detail: lastScan.error || "Scan failed",
+        variant: "error",
+      },
+    totalDevices > 0
+      ? {
+        label: "Visibility",
+        detail: `${audioDevices} audio · ${totalDevices} total`,
+        variant: "success",
+      }
+      : {
+        label: "Visibility",
+        detail: "No devices reported",
+        variant: "warning",
+      },
+  ];
+  const diagnosticBundle = JSON.stringify(
+    {
+      checkedAt: diagnostics?.checkedAt ?? new Date().toISOString(),
+      api: {
+        ok: !apiError && Boolean(diagnostics),
+        latencyMs: apiLatencyMs,
+        error: apiError,
+      },
+      visibleDevices: { total: totalDevices, audio: audioDevices },
+      lastUiAction: lastAction,
+      bluetooth: diagnostics,
+    },
+    null,
+    2,
+  );
+
+  return (
+    <Section padding={0}>
+      <VStack gap={0}>
+        <HStack
+          gap={4}
+          padding={5}
+          hAlign="between"
+          vAlign="center"
+          wrap="wrap"
+        >
+          <VStack gap={1}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={Bug} color="accent" size="sm" />
+              <Heading level={2}>Bluetooth diagnostics</Heading>
+            </HStack>
+            <Text color="secondary">
+              Follow the production signal path and copy the evidence if a stage
+              fails.
+            </Text>
+          </VStack>
+          <Button
+            label="Refresh diagnostics"
+            variant="secondary"
+            size="sm"
+            icon={<Icon icon={RefreshCw} size="sm" />}
+            isLoading={isRefreshing}
+            isDisabled={isBusy}
+            onClick={onRefresh}
+          />
+        </HStack>
+        <Section variant="muted" padding={5}>
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            {steps.map((step, index) => (
+              <HStack key={step.label} gap={3} vAlign="center">
+                <DiagnosticStepView step={step} />
+                {index < steps.length - 1 && (
+                  <Icon icon={ArrowRight} color="secondary" size="sm" />
+                )}
+              </HStack>
+            ))}
+          </HStack>
+        </Section>
+        <Collapsible
+          defaultIsOpen={false}
+          trigger={
+            <HStack gap={2} vAlign="center">
+              <Icon icon={ListFilter} size="sm" />
+              <Text type="label">Production details</Text>
+            </HStack>
+          }
+        >
+          <VStack gap={5} padding={5}>
+            <MetadataList columns="multi">
+              <MetadataListItem label="Controller">
+                {bluetoothStatus?.adapterName || "Not reported"}
+              </MetadataListItem>
+              <MetadataListItem label="Controller address">
+                {bluetoothStatus?.adapterAddress || "Not reported"}
+              </MetadataListItem>
+              <MetadataListItem label="API checked">
+                {formatDiagnosticTime(diagnostics?.checkedAt)}
+              </MetadataListItem>
+              <MetadataListItem label="Last power check">
+                {lastPower
+                  ? `${lastPower.state} · ${lastPower.attempts} attempts`
+                  : "Not run since startup"}
+              </MetadataListItem>
+              <MetadataListItem label="Last discovery">
+                {lastScan
+                  ? `${lastScan.state} · ${formatDuration(lastScan.durationMs)}`
+                  : "Not run since startup"}
+              </MetadataListItem>
+              <MetadataListItem label="Last UI action">
+                {lastAction
+                  ? `${lastAction.name} · ${lastAction.state}`
+                  : "No action in this browser"}
+              </MetadataListItem>
+            </MetadataList>
+            <CodeBlock
+              title="airwave-bluetooth-diagnostics.json"
+              language="json"
+              code={diagnosticBundle}
+              width="100%"
+              maxHeight={320}
+              isWrapped
+            />
+          </VStack>
+        </Collapsible>
+      </VStack>
+    </Section>
+  );
+}
+
+function DiagnosticStepView({ step }: { step: DiagnosticStep }) {
+  return (
+    <VStack gap={1}>
+      <HStack gap={2} vAlign="center">
+        <StatusDot
+          variant={step.variant}
+          label={`${step.label}: ${step.detail}`}
+          isPulsing={step.pulsing}
+        />
+        <Text type="label">{step.label}</Text>
+      </HStack>
+      <Text type="supporting" color="secondary">{step.detail}</Text>
+    </VStack>
   );
 }
 
@@ -325,6 +681,7 @@ function CurrentOutput({
 function DeviceList({
   loading,
   devices,
+  showAllDevices,
   selectedAddress,
   pendingAction,
   busy,
@@ -335,6 +692,7 @@ function DeviceList({
 }: {
   loading: boolean;
   devices: BluetoothDevice[];
+  showAllDevices: boolean;
   selectedAddress: string | null;
   pendingAction: string | null;
   busy: boolean;
@@ -357,8 +715,12 @@ function DeviceList({
       <EmptyState
         isCompact
         icon={<Icon icon={BluetoothSearching} color="accent" size="lg" />}
-        title="No audio devices found"
-        description="Start a scan while your speaker or headphones are in pairing mode."
+        title={showAllDevices
+          ? "No Bluetooth devices found"
+          : "No audio devices identified"}
+        description={showAllDevices
+          ? "Start a scan while the nearby device is in pairing mode."
+          : "Scan again or turn on Show all devices to inspect everything BlueZ can see."}
       />
     );
   }
@@ -409,6 +771,12 @@ function DeviceList({
                       isDisabled={busy}
                       onClick={() => onPair(device)}
                     />
+                  )
+                  : !device.audioCapable
+                  ? (
+                    <Text type="supporting" color="secondary">
+                      Not an audio output
+                    </Text>
                   )
                   : selected && device.connected
                   ? (
@@ -463,6 +831,34 @@ function deviceIcon(device: BluetoothDevice | null) {
 
 function deviceDescription(device: BluetoothDevice): string {
   if (device.connected) return "Bluetooth audio connected";
+  if (!device.audioCapable && device.paired) return "No audio profile reported";
+  if (!device.audioCapable) return "Audio profile not known until pairing";
   if (device.paired) return "Ready to connect";
   return "Available to pair";
+}
+
+function diagnosticActionName(key: string): string {
+  const action = key.split(":", 1)[0];
+  if (action === "scan") return "Device scan";
+  if (action === "refresh") return "Diagnostics refresh";
+  if (action === "pair") return "Pair device";
+  if (action === "connect") return "Connect device";
+  if (action === "disconnect") return "Disconnect device";
+  if (action === "local") return "Select Pi audio";
+  return action;
+}
+
+function formatDuration(durationMs: number | null): string {
+  if (durationMs === null) return "In progress";
+  if (durationMs < 1_000) return `${durationMs} ms`;
+  return `${(durationMs / 1_000).toFixed(1)} s`;
+}
+
+function formatDiagnosticTime(value: string | undefined): string {
+  if (!value) return "Not checked";
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
 }

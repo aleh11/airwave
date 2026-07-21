@@ -123,3 +123,20 @@ export interface BluetoothAudioStatus {
   devices: BluetoothDevice[];
   error: string | null;
 }
+
+export interface BluetoothOperationDiagnostics {
+  state: "running" | "success" | "error";
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  attempts: number;
+  output: string;
+  error: string | null;
+}
+
+export interface BluetoothDiagnostics {
+  checkedAt: string;
+  status: BluetoothAudioStatus;
+  lastPower: BluetoothOperationDiagnostics | null;
+  lastScan: BluetoothOperationDiagnostics | null;
+}

@@ -50,6 +50,14 @@ Deno.test("audio API lists and selects Bluetooth outputs", async () => {
     assertEquals(listResponse.status, 200);
     assertEquals(listBody.devices[0].name, "Lounge Speaker");
 
+    const diagnosticsResponse = await handler(
+      new Request("http://localhost/api/audio/diagnostics"),
+    );
+    const diagnosticsBody = await diagnosticsResponse.json();
+    assertEquals(diagnosticsResponse.status, 200);
+    assertEquals(diagnosticsBody.status.devices[0].name, "Lounge Speaker");
+    assertEquals(typeof diagnosticsBody.checkedAt, "string");
+
     const connectResponse = await handler(
       new Request(
         "http://localhost/api/audio/devices/AA:BB:CC:DD:EE:FF/connect",
