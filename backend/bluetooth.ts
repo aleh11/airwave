@@ -38,6 +38,7 @@ interface BluetoothManagerOptions {
   command?: string;
   selectedDeviceAddress?: string | null;
   runner?: BluetoothCommandRunner;
+  powerRetryDelayMs?: number;
   onSelectedDeviceChange?: (address: string | null) => void;
   onAudioDeviceChange?: (
     address: string | null,
@@ -69,6 +70,7 @@ export class BluetoothManager {
   #scanning = false;
   #scanPromise: Promise<BluetoothAudioStatus> | null = null;
   #operationChain = Promise.resolve();
+  #powerRetryDelayMs: number;
   #onSelectedDeviceChange: (address: string | null) => void;
   #onAudioDeviceChange: (
     address: string | null,
@@ -83,6 +85,7 @@ export class BluetoothManager {
         isBluetoothAddress(options.selectedDeviceAddress)
       ? normalizeAddress(options.selectedDeviceAddress)
       : null;
+    this.#powerRetryDelayMs = options.powerRetryDelayMs ?? 750;
     this.#onSelectedDeviceChange = options.onSelectedDeviceChange ?? (() => {});
     this.#onAudioDeviceChange = options.onAudioDeviceChange ?? (() => {});
   }
@@ -155,7 +158,7 @@ export class BluetoothManager {
     if (this.#scanPromise) return this.#scanPromise;
     const duration = Math.min(30, Math.max(3, Math.round(seconds)));
     this.#scanPromise = this.#queue(async () => {
-      await this.#runAction(["power", "on"], 10_000);
+      await this.#ensurePowered();
       this.#scanning = true;
       try {
         await this.#run(
@@ -176,7 +179,7 @@ export class BluetoothManager {
   async pair(address: string): Promise<BluetoothAudioStatus> {
     const normalized = requireAddress(address);
     return await this.#queue(async () => {
-      await this.#runAction(["power", "on"], 10_000);
+      await this.#ensurePowered();
       let device: BluetoothDevice | null = null;
       try {
         device = await this.#getDevice(normalized);
@@ -337,6 +340,43 @@ export class BluetoothManager {
     );
     if (failure) throw new BluetoothError(502, failure[0]);
   }
+
+  async #ensurePowered(): Promise<void> {
+    const status = await this.getStatus();
+    if (!status.available) {
+      throw new BluetoothError(
+        503,
+        status.error || "No Bluetooth controller is available.",
+      );
+    }
+    if (status.powered) return;
+
+    let lastFailure = "The Bluetooth controller did not power on.";
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const result = await this.#run(["power", "on"], 10_000, true);
+      const output = cleanOutput(result.stdout, result.stderr);
+      const failure = output.match(
+        /(?:Failed to .*|No default controller available|Device .* not available)/i,
+      );
+      if (result.success && !failure) return;
+
+      lastFailure = failure?.[0] || commandError(result);
+      if (/org\.bluez\.Error\.Blocked|RFKilled/i.test(output)) {
+        throw new BluetoothError(
+          503,
+          "Bluetooth is blocked. Run `sudo rfkill unblock bluetooth`, then restart Airwave.",
+        );
+      }
+      if (attempt < 3) {
+        await delay(this.#powerRetryDelayMs * attempt);
+      }
+    }
+
+    throw new BluetoothError(
+      502,
+      `Bluetooth controller could not power on after 3 attempts. BlueZ reported: ${lastFailure}. Check rfkill and bluetooth.service.`,
+    );
+  }
 }
 
 export function createBluetoothCommandRunner(
@@ -483,4 +523,8 @@ function cleanOutput(...values: string[]): string {
 
 function stripAnsi(value: string): string {
   return value.replace(ansiSequencePattern, "");
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

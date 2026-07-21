@@ -192,7 +192,7 @@ install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y --no-install-recommends \
-    mpv gpiod ca-certificates bluez bluez-alsa-utils
+    mpv gpiod ca-certificates bluez bluez-alsa-utils rfkill
 }
 
 prepare_service_account() {
@@ -382,6 +382,8 @@ UNIT
 start_airwave() {
   systemctl daemon-reload
   systemctl enable --now bluetooth.service bluealsa.service >/dev/null
+  rfkill unblock bluetooth
+  systemctl restart bluetooth.service bluealsa.service
   systemctl enable --now airwave-update.path >/dev/null
   systemctl enable "${service_name}" >/dev/null
   systemctl restart "${service_name}"

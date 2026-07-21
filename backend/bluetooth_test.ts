@@ -137,6 +137,62 @@ Deno.test("Bluetooth manager reports a missing controller without throwing", asy
   });
 });
 
+Deno.test("Bluetooth manager retries transient controller power failures", async () => {
+  let powerAttempts = 0;
+  const manager = new BluetoothManager({
+    powerRetryDelayMs: 0,
+    runner: (args) => {
+      if (args[0] === "show") {
+        return Promise.resolve(result(`Controller 00:11:22:33:44:55 airwave
+  Name: airwave
+  Alias: airwave
+  Powered: ${powerAttempts === 3 ? "yes" : "no"}`));
+      }
+      if (args[0] === "power") {
+        powerAttempts += 1;
+        return Promise.resolve(
+          result(
+            powerAttempts === 3
+              ? "Changing power on succeeded"
+              : "Failed to set power on: org.bluez.Error.Failed",
+          ),
+        );
+      }
+      return Promise.resolve(result(""));
+    },
+  });
+
+  const status = await manager.scan(3, true);
+  assertEquals(powerAttempts, 3);
+  assertEquals(status.powered, true);
+});
+
+Deno.test("Bluetooth manager explains a persistent power failure", async () => {
+  let powerAttempts = 0;
+  const manager = new BluetoothManager({
+    powerRetryDelayMs: 0,
+    runner: (args) => {
+      if (args[0] === "show") {
+        return Promise.resolve(result(`Controller 00:11:22:33:44:55 airwave
+  Name: airwave
+  Alias: airwave
+  Powered: no`));
+      }
+      if (args[0] === "power") powerAttempts += 1;
+      return Promise.resolve(
+        result("Failed to set power on: org.bluez.Error.Failed"),
+      );
+    },
+  });
+
+  await assertRejects(
+    () => manager.scan(3),
+    BluetoothError,
+    "could not power on after 3 attempts",
+  );
+  assertEquals(powerAttempts, 3);
+});
+
 function result(
   stdout: string,
   success = true,
