@@ -162,6 +162,21 @@ sudo ./install.sh /path/to/airwave-linux-arm64
 Edit `/etc/airwave.env` if the detected GPIO chip or button lines need to be
 changed, then run `sudo systemctl restart airwave`.
 
+## Uninstall
+
+Remove the service and binary while preserving configuration and listening data:
+
+```bash
+curl -fsSL https://github.com/aleh11/airwave/releases/latest/download/uninstall.sh | sudo bash
+```
+
+To also remove `/etc/airwave.env`, `/var/lib/airwave`, and the restricted
+service account:
+
+```bash
+curl -fsSL https://github.com/aleh11/airwave/releases/latest/download/uninstall.sh | sudo bash -s -- --purge
+```
+
 ## GPIO wiring
 
 Wire each momentary button between its configured GPIO line and ground.

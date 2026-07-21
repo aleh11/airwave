@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -20,6 +20,6 @@ jobs:
       - run: deno task test
       - run: deno task compile
       - run: cd build && sha256sum airwave-linux-arm64 > airwave-linux-arm64.sha256
-      - run: gh release create "${GITHUB_REF_NAME}" build/airwave-linux-arm64 build/airwave-linux-arm64.sha256 install.sh --verify-tag --generate-notes --title "Airwave ${GITHUB_REF_NAME}"
+      - run: gh release create "${GITHUB_REF_NAME}" build/airwave-linux-arm64 build/airwave-linux-arm64.sha256 install.sh uninstall.sh --verify-tag --generate-notes --title "Airwave ${GITHUB_REF_NAME}"
         env:
           GH_TOKEN: ${{ github.token }}
