@@ -3,6 +3,7 @@ import type {
   DiscoveryStation,
   ListeningStats,
   Station,
+  UpdateStatus,
   VersionInfo,
 } from "./types.ts";
 
@@ -77,6 +78,17 @@ export async function getVersion(): Promise<VersionInfo> {
 
 export async function checkForUpdates(): Promise<VersionInfo> {
   return await request<VersionInfo>("/api/version/check");
+}
+
+export async function beginUpdate(): Promise<UpdateStatus> {
+  return await request<UpdateStatus>("/api/version/update", {
+    method: "POST",
+    headers: { "X-Airwave-Action": "update" },
+  });
+}
+
+export async function getUpdateStatus(): Promise<UpdateStatus> {
+  return await request<UpdateStatus>("/api/version/update");
 }
 
 export async function getAudioStatus(

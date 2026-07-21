@@ -7,6 +7,9 @@ service_user="airwave"
 install_path="/usr/local/bin/airwave"
 environment_path="/etc/airwave.env"
 service_path="/etc/systemd/system/airwave.service"
+update_service_path="/etc/systemd/system/airwave-update.service"
+update_path_unit="/etc/systemd/system/airwave-update.path"
+update_helper="/usr/local/libexec/airwave-update"
 data_path="/var/lib/airwave"
 purge=false
 
@@ -31,7 +34,13 @@ esac
 command -v systemctl >/dev/null 2>&1 || fail "systemd is required"
 
 systemctl disable --now "${service_name}" >/dev/null 2>&1 || true
-rm -f -- "${service_path}" "${install_path}"
+systemctl disable --now airwave-update.path >/dev/null 2>&1 || true
+rm -f -- \
+  "${service_path}" \
+  "${update_service_path}" \
+  "${update_path_unit}" \
+  "${update_helper}" \
+  "${install_path}"
 systemctl daemon-reload
 systemctl reset-failed "${service_name}" >/dev/null 2>&1 || true
 

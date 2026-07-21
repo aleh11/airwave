@@ -4,6 +4,7 @@ import { BluetoothCommandResult, BluetoothManager } from "./bluetooth.ts";
 import { RadioDatabase } from "./db.ts";
 import { RadioBrowserClient } from "./radiobrowser.ts";
 import { createInitialState, RadioStateMachine } from "./state.ts";
+import { ReleaseUpdateCoordinator } from "./version.ts";
 
 const speakerInfo = `Device AA:BB:CC:DD:EE:FF (public)
   Name: Lounge Speaker
@@ -90,6 +91,59 @@ Deno.test("audio API validates scan duration", async () => {
     });
   } finally {
     database.close();
+  }
+});
+
+Deno.test("update API queues the newest release", async () => {
+  const database = await RadioDatabase.open(":memory:");
+  const directory = await Deno.makeTempDir();
+  const requestPath = `${directory}/update.request`;
+  try {
+    const handler = createApiHandler(
+      database,
+      new RadioBrowserClient(),
+      new RadioStateMachine(createInitialState()),
+      new BluetoothManager({
+        runner: () => Promise.resolve(result("")),
+      }),
+      {
+        versionChecker: {
+          current: () => ({
+            current: "0.1.0",
+            latest: null,
+            updateAvailable: false,
+            releaseUrl: null,
+          }),
+          check: () =>
+            Promise.resolve({
+              current: "0.1.0",
+              latest: "0.2.0",
+              updateAvailable: true,
+              releaseUrl: "https://example.com/airwave/v0.2.0",
+            }),
+        },
+        updateCoordinator: new ReleaseUpdateCoordinator(
+          requestPath,
+          `${directory}/update.status.json`,
+        ),
+      },
+    );
+    const response = await handler(
+      new Request("http://localhost/api/version/update", {
+        method: "POST",
+        headers: { "X-Airwave-Action": "update" },
+      }),
+    );
+    assertEquals(response.status, 202);
+    assertEquals(await response.json(), {
+      state: "requested",
+      version: "0.2.0",
+      message: "The update has been queued.",
+    });
+    assertEquals(await Deno.readTextFile(requestPath), "0.2.0\n");
+  } finally {
+    database.close();
+    await Deno.remove(directory, { recursive: true });
   }
 });
 

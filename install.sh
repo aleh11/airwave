@@ -7,6 +7,11 @@ service_user="airwave"
 install_path="/usr/local/bin/airwave"
 environment_path="/etc/airwave.env"
 service_path="/etc/systemd/system/airwave.service"
+update_service_path="/etc/systemd/system/airwave-update.service"
+update_path_unit="/etc/systemd/system/airwave-update.path"
+update_helper="/usr/local/libexec/airwave-update"
+update_request_path="/var/lib/airwave/update.request"
+update_status_path="/var/lib/airwave/update.status.json"
 repository="aleh11/airwave"
 release_asset="airwave-linux-arm64"
 release_base_url="${AIRWAVE_RELEASE_BASE_URL:-https://github.com/${repository}/releases/latest/download}"
@@ -222,11 +227,126 @@ install_service_files() {
       printf 'AIRWAVE_MPV_COMMAND=%s\n' "/usr/bin/mpv"
       printf 'AIRWAVE_MPV_SOCKET=%s\n' "/run/${service_name}/mpv.sock"
       printf 'AIRWAVE_BLUETOOTHCTL_COMMAND=%s\n' "/usr/bin/bluetoothctl"
+      printf 'AIRWAVE_UPDATE_REQUEST_PATH=%s\n' "${update_request_path}"
+      printf 'AIRWAVE_UPDATE_STATUS_PATH=%s\n' "${update_status_path}"
       printf 'AIRWAVE_GPIO_CHIP=%s\n' "${gpio_chip}"
       printf 'AIRWAVE_GPIO_BIAS=%s\n' "${AIRWAVE_GPIO_BIAS:-pull-up}"
       printf "AIRWAVE_GPIO_BUTTONS='%s'\n" "${AIRWAVE_GPIO_BUTTONS:-{\"17\":\"toggle\",\"27\":\"next\",\"22\":\"volumeUp\",\"23\":\"volumeDown\"}}"
     } > "${environment_path}"
   fi
+
+  if ! grep -q '^AIRWAVE_UPDATE_REQUEST_PATH=' "${environment_path}"; then
+    printf 'AIRWAVE_UPDATE_REQUEST_PATH=%s\n' "${update_request_path}" >> "${environment_path}"
+  fi
+  if ! grep -q '^AIRWAVE_UPDATE_STATUS_PATH=' "${environment_path}"; then
+    printf 'AIRWAVE_UPDATE_STATUS_PATH=%s\n' "${update_status_path}" >> "${environment_path}"
+  fi
+
+  install -d -m 0755 -o root -g root /usr/local/libexec
+  cat > "${update_helper}" <<'UPDATER'
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+service_name="airwave"
+service_user="airwave"
+install_path="/usr/local/bin/airwave"
+request_path="${AIRWAVE_UPDATE_REQUEST_PATH:-/var/lib/airwave/update.request}"
+status_path="${AIRWAVE_UPDATE_STATUS_PATH:-/var/lib/airwave/update.status.json}"
+release_asset="airwave-linux-arm64"
+temp_dir=""
+version="unknown"
+
+write_status() {
+  local state="$1"
+  local message="$2"
+  local temporary_status="${status_path}.tmp.$$"
+  printf '{"state":"%s","version":"%s","message":"%s"}\n' \
+    "${state}" "${version}" "${message}" > "${temporary_status}"
+  chmod 0644 "${temporary_status}"
+  chown "${service_user}:${service_user}" "${temporary_status}"
+  mv -f -- "${temporary_status}" "${status_path}"
+}
+
+cleanup_update() {
+  if [[ -n "${temp_dir}" && -d "${temp_dir}" ]]; then
+    rm -f -- \
+      "${temp_dir}/${release_asset}" \
+      "${temp_dir}/${release_asset}.sha256"
+    rmdir -- "${temp_dir}"
+  fi
+}
+
+fail_update() {
+  local exit_code=$?
+  trap - ERR
+  set +e
+  write_status "failed" "The update could not be installed."
+  rm -f -- "${request_path}"
+  cleanup_update
+  exit "${exit_code}"
+}
+
+trap fail_update ERR
+
+version="$(tr -d '[:space:]' < "${request_path}")"
+[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+release_base_url="${AIRWAVE_RELEASE_BASE_URL:-https://github.com/aleh11/airwave/releases/download/v${version}}"
+temp_dir="$(mktemp -d)"
+
+write_status "downloading" "Downloading Airwave v${version}."
+curl --fail --silent --show-error --location --retry 3 --proto '=https' --tlsv1.2 \
+  "${release_base_url}/${release_asset}" \
+  --output "${temp_dir}/${release_asset}"
+curl --fail --silent --show-error --location --retry 3 --proto '=https' --tlsv1.2 \
+  "${release_base_url}/${release_asset}.sha256" \
+  --output "${temp_dir}/${release_asset}.sha256"
+
+(
+  cd -- "${temp_dir}"
+  sha256sum --check "${release_asset}.sha256"
+)
+
+write_status "installing" "Installing Airwave v${version}."
+install -m 0755 -o root -g root \
+  "${temp_dir}/${release_asset}" "${install_path}.next"
+mv -f -- "${install_path}.next" "${install_path}"
+write_status "restarting" "Restarting Airwave v${version}."
+rm -f -- "${request_path}"
+cleanup_update
+systemctl restart "${service_name}"
+trap - ERR
+UPDATER
+  chmod 0755 "${update_helper}"
+
+  cat > "${update_service_path}" <<'UNIT'
+[Unit]
+Description=Install an Airwave release update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/airwave.env
+ExecStart=/usr/local/libexec/airwave-update
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/usr/local/bin /var/lib/airwave
+UNIT
+
+  cat > "${update_path_unit}" <<'UNIT'
+[Unit]
+Description=Watch for Airwave update requests
+
+[Path]
+PathExists=/var/lib/airwave/update.request
+Unit=airwave-update.service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 
   cat > "${service_path}" <<'UNIT'
 [Unit]
@@ -262,6 +382,7 @@ UNIT
 start_airwave() {
   systemctl daemon-reload
   systemctl enable --now bluetooth.service bluealsa.service >/dev/null
+  systemctl enable --now airwave-update.path >/dev/null
   systemctl enable "${service_name}" >/dev/null
   systemctl restart "${service_name}"
 

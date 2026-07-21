@@ -103,6 +103,8 @@ subprocess permissions are embedded in the executable. The frontend build under
 | `AIRWAVE_MPV_COMMAND`          | `mpv`                    | `mpv` executable path                     |
 | `AIRWAVE_MPV_SOCKET`           | `/tmp/airwave-mpv.sock`  | `mpv` IPC socket                          |
 | `AIRWAVE_BLUETOOTHCTL_COMMAND` | `bluetoothctl`           | BlueZ control executable path             |
+| `AIRWAVE_UPDATE_REQUEST_PATH`  | unset                    | Enables installed-device update requests  |
+| `AIRWAVE_UPDATE_STATUS_PATH`   | request path + status    | Update progress shared with the dashboard |
 | `AIRWAVE_GPIO_CHIP`            | unset                    | GPIO chip; leaving it unset disables GPIO |
 | `AIRWAVE_GPIO_BIAS`            | `pull-up`                | `pull-up` or `external`                   |
 | `AIRWAVE_GPIO_BUTTONS`         | standard four-button map | JSON map from line offsets to actions     |
@@ -172,7 +174,9 @@ sudo ./install.sh
 ```
 
 It is safe to run the installer again for an upgrade and it preserves an
-existing `/etc/airwave.env`.
+existing `/etc/airwave.env`. Installed devices can also check for a release and
+select **Update now** from the dashboard. The updater verifies the release
+checksum before replacing the binary and restarting Airwave.
 
 The binary may also be passed explicitly:
 

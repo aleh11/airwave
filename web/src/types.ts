@@ -84,6 +84,22 @@ export interface VersionInfo {
   releaseUrl: string | null;
 }
 
+export type UpdateState =
+  | "unavailable"
+  | "idle"
+  | "requested"
+  | "downloading"
+  | "installing"
+  | "restarting"
+  | "complete"
+  | "failed";
+
+export interface UpdateStatus {
+  state: UpdateState;
+  version: string | null;
+  message: string | null;
+}
+
 export interface BluetoothDevice {
   address: string;
   name: string;

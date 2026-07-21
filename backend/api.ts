@@ -6,6 +6,7 @@ import type { StationInput } from "./types.ts";
 import {
   ReleaseUpdateCoordinator,
   ReleaseVersionChecker,
+  type VersionInfo,
 } from "./version.ts";
 
 type VersionChecker = Pick<ReleaseVersionChecker, "current" | "check">;
@@ -70,13 +71,16 @@ export function createApiHandler(
       if (
         url.pathname === "/api/version/update" && request.method === "POST"
       ) {
+        if (request.headers.get("X-Airwave-Action") !== "update") {
+          throw new ApiError(400, "The update request is invalid.");
+        }
         if (!updateCoordinator.isEnabled()) {
           throw new ApiError(
             503,
             "Automatic updates are only available on an installed Airwave device.",
           );
         }
-        let version;
+        let version: VersionInfo;
         try {
           version = await versionChecker.check();
         } catch (error) {
@@ -92,7 +96,14 @@ export function createApiHandler(
             message: "Airwave is already up to date.",
           });
         }
-        return json(await updateCoordinator.request(version.latest), 202);
+        try {
+          return json(await updateCoordinator.request(version.latest), 202);
+        } catch (error) {
+          const detail = error instanceof Error
+            ? error.message
+            : "Unknown error";
+          throw new ApiError(500, `Could not queue the update: ${detail}`);
+        }
       }
       if (url.pathname === "/api/audio" && request.method === "GET") {
         return json(

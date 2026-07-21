@@ -24,6 +24,7 @@ import { VStack } from "@astryxdesign/core/VStack";
 import {
   AlarmClock,
   Compass,
+  Download,
   Headphones,
   Monitor,
   Moon,
@@ -34,9 +35,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  beginUpdate,
   checkForUpdates,
   createStation,
   getStations,
+  getUpdateStatus,
   getVersion,
   removeStation,
   setFavorite,
@@ -111,6 +114,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const showToast = useToast();
   const notify = useCallback<Notify>((message, kind = "info") => {
@@ -233,28 +237,72 @@ function Airwave({ palette, mode, setPalette, setMode }: {
     [notify, refreshStations],
   );
 
+  const installUpdate = useCallback(async (latest: string) => {
+    setUpdating(true);
+    showToast({
+      uniqueID: "airwave-update",
+      collisionBehavior: "overwrite",
+      body: `Updating Airwave to v${latest}…`,
+      type: "info",
+      isAutoHide: false,
+      endContent: (
+        <Button
+          label="Updating"
+          variant="primary"
+          size="sm"
+          icon={<Icon icon={Download} size="sm" />}
+          isLoading
+        />
+      ),
+    });
+    try {
+      const update = await beginUpdate();
+      if (update.state !== "complete") {
+        await waitForUpdate(latest);
+      }
+      showToast({
+        uniqueID: "airwave-update",
+        collisionBehavior: "overwrite",
+        body: `Airwave v${latest} installed. Reconnecting…`,
+        type: "info",
+        isAutoHide: false,
+      });
+      globalThis.setTimeout(() => globalThis.location.reload(), 900);
+    } catch (error) {
+      showToast({
+        uniqueID: "airwave-update",
+        collisionBehavior: "overwrite",
+        body: errorMessage(error),
+        type: "error",
+        isAutoHide: false,
+      });
+    } finally {
+      setUpdating(false);
+    }
+  }, [showToast]);
+
   const checkUpdates = useCallback(async () => {
     setCheckingUpdates(true);
     try {
       const nextVersion = await checkForUpdates();
       setVersion(nextVersion);
-      if (nextVersion.updateAvailable) {
+      const latest = nextVersion.latest;
+      if (nextVersion.updateAvailable && latest) {
         showToast({
-          body: `Airwave ${nextVersion.latest} is ready.`,
+          uniqueID: "airwave-update",
+          collisionBehavior: "overwrite",
+          body: `Airwave v${latest} is available.`,
           type: "info",
           isAutoHide: false,
-          endContent: nextVersion.releaseUrl
-            ? (
-              <Button
-                label="View release"
-                href={nextVersion.releaseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="ghost"
-                size="sm"
-              />
-            )
-            : undefined,
+          endContent: (
+            <Button
+              label="Update now"
+              variant="primary"
+              size="sm"
+              icon={<Icon icon={Download} size="sm" />}
+              clickAction={() => installUpdate(latest)}
+            />
+          ),
         });
       } else {
         notify(`Airwave ${nextVersion.current} is up to date.`);
@@ -264,7 +312,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
     } finally {
       setCheckingUpdates(false);
     }
-  }, [notify, showToast]);
+  }, [installUpdate, notify, showToast]);
 
   const navigation = (
     <SideNav
@@ -320,7 +368,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
           icon={<Icon icon={RefreshCw} size="sm" />}
           variant="ghost"
           size="sm"
-          isLoading={checkingUpdates}
+          isLoading={checkingUpdates || updating}
           onClick={checkUpdates}
         />
       }
@@ -449,6 +497,24 @@ function Airwave({ palette, mode, setPalette, setMode }: {
       />
     </>
   );
+}
+
+async function waitForUpdate(version: string): Promise<void> {
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 1_500));
+    try {
+      const status = await getUpdateStatus();
+      if (status.state === "complete" && status.version === version) return;
+      if (status.state === "failed") {
+        throw new Error(status.message || "The update could not be installed.");
+      }
+    } catch (error) {
+      if (error instanceof TypeError) continue;
+      throw error;
+    }
+  }
+  throw new Error("The update is taking longer than expected.");
 }
 
 function readSetting(key: string): string | null {

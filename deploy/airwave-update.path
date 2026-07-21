@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for Airwave update requests
+
+[Path]
+PathExists=/var/lib/airwave/update.request
+Unit=airwave-update.service
+
+[Install]
+WantedBy=multi-user.target

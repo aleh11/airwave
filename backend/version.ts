@@ -122,7 +122,9 @@ export class ReleaseUpdateCoordinator {
       };
     }
     try {
-      const status = parseUpdateStatus(await Deno.readTextFile(this.statusPath));
+      const status = parseUpdateStatus(
+        await Deno.readTextFile(this.statusPath),
+      );
       if (
         status.version === packageMetadata.version &&
         status.state !== "failed"
@@ -162,7 +164,11 @@ function normalizeVersion(value: string | undefined): string | null {
 }
 
 function parseUpdateStatus(value: string): UpdateStatus {
-  const parsed = JSON.parse(value) as Record<string, unknown>;
+  const candidate = JSON.parse(value) as unknown;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    throw new Error("The update status file is invalid.");
+  }
+  const parsed = candidate as Record<string, unknown>;
   const states: UpdateState[] = [
     "unavailable",
     "idle",
