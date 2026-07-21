@@ -8,6 +8,9 @@
     "typecheck": "tsc --noEmit -p web/tsconfig.json"
   },
   "dependencies": {
+    "@astryxdesign/core": "0.1.6",
+    "@astryxdesign/theme-neutral": "0.1.6",
+    "@stylexjs/stylex": "0.19.0",
     "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-react": "6.0.3",
     "vite": "8.1.5",
@@ -16,6 +19,7 @@
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "0.1.6",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

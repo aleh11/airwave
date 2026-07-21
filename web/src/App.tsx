@@ -1,4 +1,8 @@
 import {
+  SegmentedControl,
+  SegmentedControlItem,
+} from "@astryxdesign/core/SegmentedControl";
+import {
   FormEvent,
   useCallback,
   useEffect,
@@ -379,48 +383,25 @@ function TopBar({ connected, state, role, playerConnected, setTarget }: {
           </p>
         </div>
       </div>
-      <div
-        className="flex border border-[#172426]/20 bg-[#c4c6c0] p-1"
-        aria-label="Playback target"
+      <SegmentedControl
+        className="shrink-0"
+        value={state?.target ?? "browser"}
+        onChange={(target) => setTarget(target as "browser" | "appliance")}
+        label="Playback target"
+        size="sm"
       >
-        <TargetButton
-          active={!state || state.target === "browser"}
-          icon="browser"
+        <SegmentedControlItem
+          value="browser"
           label="Browser"
-          onClick={() => setTarget("browser")}
+          icon={<Icon name="browser" className="h-4 w-4" />}
         />
-        <TargetButton
-          active={state?.target === "appliance"}
-          icon="device"
+        <SegmentedControlItem
+          value="appliance"
           label="Pi output"
-          onClick={() => setTarget("appliance")}
+          icon={<Icon name="device" className="h-4 w-4" />}
         />
-      </div>
+      </SegmentedControl>
     </header>
-  );
-}
-
-function TargetButton({ active, icon, label, onClick }: {
-  active: boolean;
-  icon: "browser" | "device";
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`flex h-9 items-center gap-2 px-3 text-[10px] font-bold tracking-[0.08em] uppercase transition-colors ${focusRing} ${
-        active
-          ? "bg-[#172426] text-white"
-          : "text-[#526164] hover:text-[#172426]"
-      }`}
-      onClick={onClick}
-      aria-pressed={active}
-      aria-label={label}
-    >
-      <Icon name={icon} className="h-4 w-4" />
-      <span className="hidden sm:inline">{label}</span>
-    </button>
   );
 }
 
