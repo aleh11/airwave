@@ -4,8 +4,8 @@ Project-specific guidance for AI coding agents.
 
 <!-- ASTRYX:START -->
 
-Astryx v0.1.6 · 149 components CLI: run every command as `npx astryx <cmd>`
-(shown below as `astryx ...`).
+Astryx v0.1.6 · 149 components CLI: run every command as
+`deno task astryx <cmd>` (shown below as `astryx ...`).
 
 SETUP (once, in your app entry e.g. main.tsx) — without these, components render
 unstyled: import "@astryxdesign/core/reset.css"; import
@@ -29,9 +29,9 @@ RULES:
   items. Card = dashboard widgets, galleries, settings groups only.
 - Status → StatusDot/Token; Badge only for counts and enumerated states, never
   decoration.
-- Custom styling: component props first; else Tailwind utilities backed by
-  tokens (bg-surface, text-primary, rounded-lg) via tailwind-theme.css. No raw
-  hex/px.
+- Custom styling: component props first; then theme tokens and StyleX when a
+  component prop cannot express the requirement. This project does not use
+  Tailwind. No raw hex/px.
 - Tokens for every value (`astryx docs tokens`). Brand/accent via `astryx theme`
   — never override --color-* in :root.
 

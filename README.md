@@ -18,7 +18,8 @@ the Pi receives one binary and no JavaScript runtime.
 - Sleep timer and one-time radio alarm
 - `mpv` output over a Unix socket
 - GPIO buttons through one `gpiomon` process with 50 ms software debounce
-- Responsive Tailwind interface with keyboard focus and reduced-motion handling
+- Native Astryx interface with Stone, Neutral, and Y2K themes plus light and
+  dark modes
 - Local and Raspberry Pi single-binary compile tasks
 
 ## Architecture
@@ -61,6 +62,14 @@ The SQLite database is created at `./data/radio.db`. The server binds to
 deno task check
 deno task test
 deno task build
+```
+
+Astryx's CLI is pinned with the design system and available through Deno:
+
+```bash
+deno task astryx doctor
+deno task astryx component Button
+deno task astryx template dashboard
 ```
 
 ## Compile
