@@ -14,23 +14,29 @@ download_dir=""
 status_log=""
 step_index=0
 step_total=7
+progress_visible=false
+status_visible=false
 
 if [[ -t 1 && "${TERM:-dumb}" != "dumb" ]]; then
   accent=$'\033[38;5;45m'
+  accent_alt=$'\033[38;5;69m'
   success=$'\033[38;5;83m'
   danger=$'\033[38;5;203m'
   muted=$'\033[38;5;244m'
   bright=$'\033[1m'
   reset=$'\033[0m'
   clear_line=$'\r\033[2K'
+  interactive=true
 else
   accent=""
+  accent_alt=""
   success=""
   danger=""
   muted=""
   bright=""
   reset=""
   clear_line=$'\r'
+  interactive=false
 fi
 
 cleanup() {
@@ -53,31 +59,78 @@ fail() {
 render_banner() {
   printf '\n%b' "${accent}"
   printf '%s\n' \
-    '      ╭────────────────────────────────────╮' \
-    '      │                                    │' \
-    '      │      ▄▀█ █ █▀█ █ █ █ ▄▀█ █ █ █▀▀  │' \
-    '      │      █▀█ █ █▀▄  ▀▄▀▄▀ █▀█ ▀▄▀ ██▄  │' \
-    '      │                                    │' \
-    '      │          tune the world            │' \
-    '      ╰────────────────────────────────────╯'
-  printf '%b      Raspberry Pi radio, beautifully simple%b\n\n' "${bright}" "${reset}"
+    '     █████╗ ██╗██████╗ ██╗    ██╗ █████╗ ██╗   ██╗███████╗' \
+    '    ██╔══██╗██║██╔══██╗██║    ██║██╔══██╗██║   ██║██╔════╝' \
+    '    ███████║██║██████╔╝██║ █╗ ██║███████║██║   ██║█████╗  '
+  printf '%b' "${accent_alt}"
+  printf '%s\n' \
+    '    ██╔══██║██║██╔══██╗██║███╗██║██╔══██║╚██╗ ██╔╝██╔══╝  ' \
+    '    ██║  ██║██║██║  ██║╚███╔███╔╝██║  ██║ ╚████╔╝ ███████╗' \
+    '    ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝  ╚═══╝  ╚══════╝'
+  printf '\n%b    ≋  T U N E   T H E   W O R L D%b' "${accent}" "${reset}"
+  printf '%b     Raspberry Pi internet radio%b\n\n' "${muted}" "${reset}"
 }
 
 render_progress() {
-  local width=28
+  local width=42
   local filled=$((step_index * width / step_total))
   local empty=$((width - filled))
   local bar=""
   local index
   for ((index = 0; index < filled; index++)); do bar+="━"; done
   for ((index = 0; index < empty; index++)); do bar+="·"; done
-  printf '     %b%s%b %3d%%\n\n' "${accent}" "${bar}" "${reset}" "$((step_index * 100 / step_total))"
+  printf '     %b%s%b %3d%%\n' "${accent}" "${bar}" "${reset}" "$((step_index * 100 / step_total))"
 }
 
 complete_step() {
   step_index=$((step_index + 1))
+  if [[ "${interactive}" == true && "${progress_visible}" == true ]]; then
+    if [[ "${status_visible}" == true ]]; then
+      printf '\033[2A'
+    else
+      printf '\033[1A'
+    fi
+    printf '%b' "${clear_line}"
+  fi
   printf '  %b✓%b  %s\n' "${success}" "${reset}" "$1"
+  if [[ "${interactive}" == true ]]; then
+    printf '%b' "${clear_line}"
+    render_progress
+    progress_visible=true
+  elif [[ "${step_index}" -eq "${step_total}" ]]; then
+    render_progress
+  fi
+  status_visible=false
+}
+
+render_status() {
+  local frame="$1"
+  local label="$2"
+  if [[ "${progress_visible}" == true ]]; then
+    if [[ "${status_visible}" == true ]]; then
+      printf '\033[2A'
+    else
+      printf '\033[1A'
+    fi
+  fi
+  printf '%b  %b%s%b  %s\n' "${clear_line}" "${accent}" "${frame}" "${reset}" "${label}"
+  printf '%b' "${clear_line}"
   render_progress
+  progress_visible=true
+  status_visible=true
+}
+
+clear_live_progress() {
+  if [[ "${interactive}" != true || "${progress_visible}" != true ]]; then
+    return
+  fi
+  if [[ "${status_visible}" == true ]]; then
+    printf '\033[2A\033[J'
+  else
+    printf '\033[1A\033[J'
+  fi
+  progress_visible=false
+  status_visible=false
 }
 
 run_step() {
@@ -88,22 +141,22 @@ run_step() {
   local status=0
   : > "${status_log}"
 
-  if [[ -t 1 ]]; then
+  if [[ "${interactive}" == true ]]; then
     "$@" >"${status_log}" 2>&1 &
     local command_pid=$!
     while kill -0 "${command_pid}" 2>/dev/null; do
-      printf '%b  %b%s%b  %s' "${clear_line}" "${accent}" "${frames[frame]}" "${reset}" "${label}"
+      render_status "${frames[frame]}" "${label}"
       frame=$(((frame + 1) % ${#frames[@]}))
       sleep 0.12
     done
     if wait "${command_pid}"; then status=0; else status=$?; fi
-    printf '%b' "${clear_line}"
   else
     printf '  ... %s\n' "${label}"
     if "$@" >"${status_log}" 2>&1; then status=0; else status=$?; fi
   fi
 
   if [[ "${status}" -ne 0 ]]; then
+    clear_live_progress
     cat "${status_log}" >&2
     fail "${label} failed"
   fi
