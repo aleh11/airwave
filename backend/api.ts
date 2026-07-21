@@ -1,23 +1,146 @@
 import { RadioDatabase } from "./db.ts";
+import { BluetoothError, BluetoothManager } from "./bluetooth.ts";
 import { RadioBrowserClient } from "./radiobrowser.ts";
 import type { RadioStateMachine } from "./state.ts";
 import type { StationInput } from "./types.ts";
+import {
+  ReleaseUpdateCoordinator,
+  ReleaseVersionChecker,
+} from "./version.ts";
+
+type VersionChecker = Pick<ReleaseVersionChecker, "current" | "check">;
+type UpdateCoordinator = Pick<
+  ReleaseUpdateCoordinator,
+  "isEnabled" | "request" | "status"
+>;
+
+export interface ApiDependencies {
+  versionChecker?: VersionChecker;
+  updateCoordinator?: UpdateCoordinator;
+}
 
 const stationPattern = new URLPattern({ pathname: "/api/stations/:id" });
 const favoritePattern = new URLPattern({
   pathname: "/api/stations/:id/favorite",
+});
+const audioDevicePattern = new URLPattern({
+  pathname: "/api/audio/devices/:address",
+});
+const audioDeviceActionPattern = new URLPattern({
+  pathname: "/api/audio/devices/:address/:action",
 });
 
 export function createApiHandler(
   database: RadioDatabase,
   discovery: RadioBrowserClient,
   machine: RadioStateMachine,
+  bluetooth: BluetoothManager,
+  dependencies: ApiDependencies = {},
 ): (request: Request) => Promise<Response> {
+  const versionChecker = dependencies.versionChecker ??
+    new ReleaseVersionChecker();
+  const updateCoordinator = dependencies.updateCoordinator ??
+    ReleaseUpdateCoordinator.fromEnvironment();
   return async (request) => {
     try {
       const url = new URL(request.url);
       if (url.pathname === "/api/health" && request.method === "GET") {
         return json({ ok: true, stateRevision: machine.state.revision });
+      }
+      if (url.pathname === "/api/version" && request.method === "GET") {
+        return json(versionChecker.current());
+      }
+      if (
+        url.pathname === "/api/version/check" && request.method === "GET"
+      ) {
+        try {
+          return json(await versionChecker.check());
+        } catch (error) {
+          const detail = error instanceof Error
+            ? error.message
+            : "Unknown error";
+          throw new ApiError(502, `Could not check for updates: ${detail}`);
+        }
+      }
+      if (
+        url.pathname === "/api/version/update" && request.method === "GET"
+      ) {
+        return json(await updateCoordinator.status());
+      }
+      if (
+        url.pathname === "/api/version/update" && request.method === "POST"
+      ) {
+        if (!updateCoordinator.isEnabled()) {
+          throw new ApiError(
+            503,
+            "Automatic updates are only available on an installed Airwave device.",
+          );
+        }
+        let version;
+        try {
+          version = await versionChecker.check();
+        } catch (error) {
+          const detail = error instanceof Error
+            ? error.message
+            : "Unknown error";
+          throw new ApiError(502, `Could not start the update: ${detail}`);
+        }
+        if (!version.updateAvailable || !version.latest) {
+          return json({
+            state: "complete",
+            version: version.current,
+            message: "Airwave is already up to date.",
+          });
+        }
+        return json(await updateCoordinator.request(version.latest), 202);
+      }
+      if (url.pathname === "/api/audio" && request.method === "GET") {
+        return json(
+          await bluetooth.getStatus(
+            url.searchParams.get("audioOnly") === "true",
+          ),
+        );
+      }
+      if (url.pathname === "/api/audio/scan" && request.method === "POST") {
+        const input = asObject(await readOptionalJson(request));
+        const seconds = input.seconds === undefined
+          ? 8
+          : numberInRange(input.seconds, 3, 30, "Scan duration");
+        return json(
+          await bluetooth.scan(seconds, input.audioOnly === true),
+        );
+      }
+      if (url.pathname === "/api/audio/output" && request.method === "PUT") {
+        const input = asObject(await readJson(request));
+        if (input.address !== null && typeof input.address !== "string") {
+          throw new ApiError(
+            400,
+            "Audio device address must be a string or null.",
+          );
+        }
+        return json(await bluetooth.select(input.address));
+      }
+      const audioDeviceActionMatch = audioDeviceActionPattern.exec(url);
+      if (audioDeviceActionMatch && request.method === "POST") {
+        const address = audioDeviceActionMatch.pathname.groups.address ?? "";
+        switch (audioDeviceActionMatch.pathname.groups.action) {
+          case "pair":
+            return json(await bluetooth.pair(address));
+          case "connect":
+            return json(await bluetooth.connect(address));
+          case "disconnect":
+            return json(await bluetooth.disconnect(address));
+          default:
+            return notFound("Audio device action not found.");
+        }
+      }
+      const audioDeviceMatch = audioDevicePattern.exec(url);
+      if (audioDeviceMatch && request.method === "DELETE") {
+        return json(
+          await bluetooth.forget(
+            audioDeviceMatch.pathname.groups.address ?? "",
+          ),
+        );
       }
       if (url.pathname === "/api/stations" && request.method === "GET") {
         return json({ stations: database.listStations() });
@@ -82,6 +205,9 @@ export function createApiHandler(
       }
       return notFound("Route not found.");
     } catch (error) {
+      if (error instanceof BluetoothError) {
+        return json({ error: error.message }, error.status);
+      }
       if (error instanceof ApiError) {
         return json({ error: error.message }, error.status);
       }
@@ -116,6 +242,35 @@ async function readJson(request: Request): Promise<unknown> {
   } catch {
     throw new ApiError(400, "Request body must be valid JSON.");
   }
+}
+
+async function readOptionalJson(request: Request): Promise<unknown> {
+  return request.body === null ? {} : await readJson(request);
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "Request body must be a JSON object.");
+  }
+  return value as Record<string, unknown>;
+}
+
+function numberInRange(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  label: string,
+): number {
+  if (
+    typeof value !== "number" || !Number.isFinite(value) || value < minimum ||
+    value > maximum
+  ) {
+    throw new ApiError(
+      400,
+      `${label} must be between ${minimum} and ${maximum}.`,
+    );
+  }
+  return value;
 }
 
 function validateStation(value: unknown): StationInput {

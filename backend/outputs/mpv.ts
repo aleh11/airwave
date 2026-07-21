@@ -7,6 +7,8 @@ export class MpvOutput {
   #socketPath: string;
   #process: Deno.ChildProcess | null = null;
   #loadedUrl: string | null = null;
+  #audioDevice = "auto";
+  #audioDeviceLabel: string | null = null;
   #writeChain = Promise.resolve();
   #unsubscribe: () => void;
 
@@ -53,6 +55,26 @@ export class MpvOutput {
     }
   }
 
+  async setAudioDevice(
+    device: string | null,
+    label: string | null = null,
+  ): Promise<void> {
+    this.#audioDevice = device ?? "auto";
+    this.#audioDeviceLabel = device ? label : null;
+    if (this.#process) {
+      await this.#enqueue(["set_property", "audio-device", this.#audioDevice]);
+    }
+    if (this.#process && this.#machine.state.target === "appliance") {
+      this.#machine.dispatch(
+        {
+          type: "setOutputStatus",
+          status: { kind: "ready", message: this.#readyMessage() },
+        },
+        "system",
+      );
+    }
+  }
+
   #sync(state: RadioState): void {
     this.#ensureProcess().then(async () => {
       if (state.station && state.station.url !== this.#loadedUrl) {
@@ -64,7 +86,7 @@ export class MpvOutput {
       this.#machine.dispatch(
         {
           type: "setOutputStatus",
-          status: { kind: "ready", message: "Appliance output ready" },
+          status: { kind: "ready", message: this.#readyMessage() },
         },
         "system",
       );
@@ -93,6 +115,7 @@ export class MpvOutput {
         "--no-video",
         "--idle=yes",
         "--audio-client-name=Airwave",
+        `--audio-device=${this.#audioDevice}`,
         `--input-ipc-server=${this.#socketPath}`,
       ],
       stdin: "null",
@@ -142,5 +165,11 @@ export class MpvOutput {
       }
     });
     return this.#writeChain;
+  }
+
+  #readyMessage(): string {
+    return this.#audioDeviceLabel
+      ? `Bluetooth audio: ${this.#audioDeviceLabel}`
+      : "Appliance output ready";
   }
 }

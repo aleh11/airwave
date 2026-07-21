@@ -1,6 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { Card } from "@astryxdesign/core/Card";
 import {
   DateTimeInput,
   type ISODateTimeString,
@@ -9,10 +8,12 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
+import { Section } from "@astryxdesign/core/Section";
 import { Selector } from "@astryxdesign/core/Selector";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
-import { AlarmClock, Moon, Timer } from "lucide-react";
+import { AlarmClock, Moon, TimerReset } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRadioSocket } from "../hooks/useRadioSocket.ts";
@@ -53,31 +54,30 @@ export function ScheduleView({ state, stations, send, notify }: {
 
   return (
     <PageFrame
-      eyebrow="Automatic controls"
-      title="Set and forget"
-      description="Let the receiver wind down at night or bring a station up at a chosen time."
+      eyebrow="Automatic playback"
+      title="Schedule"
+      description="Set a sleep timer or wake up to one of your presets."
     >
-      <Grid columns={{ minWidth: 320, max: 2 }} gap={5} align="stretch">
-        <Card padding={6} variant="muted">
-          <VStack gap={6}>
+      <Grid columns={{ minWidth: 420, max: 2 }} gap={5} align="stretch">
+        <Section variant="muted" padding={6}>
+          <VStack gap={5}>
             <HStack hAlign="between" vAlign="start" gap={4}>
               <VStack gap={2}>
                 <Text type="label" color="accent">Sleep timer</Text>
-                <Heading level={2}>Fade to quiet</Heading>
+                <Heading level={2}>Stop after</Heading>
               </VStack>
               <Icon icon={Moon} color="accent" size="lg" />
             </HStack>
             <Text color="secondary">
-              Playback stops when the timer ends, whether sound is coming from
-              this browser or the Pi.
+              Playback stops on both Browser and Pi when the timer ends.
             </Text>
             <HStack gap={2} wrap="wrap">
-              {[15, 30, 60].map((minutes) => (
+              {[15, 30, 60, 90].map((minutes) => (
                 <Button
                   key={minutes}
-                  label={`${minutes} minutes`}
+                  label={`${minutes} min`}
                   variant="secondary"
-                  icon={<Icon icon={Timer} size="sm" />}
+                  icon={<Icon icon={TimerReset} size="sm" />}
                   onClick={() => {
                     send({ type: "setSleepTimer", minutes });
                     notify(`${minutes}-minute sleep timer set.`);
@@ -85,38 +85,62 @@ export function ScheduleView({ state, stations, send, notify }: {
                 />
               ))}
             </HStack>
-            {state.sleepTimerEndsAt && (
-              <Banner
-                status="info"
-                title="Sleep timer active"
-                description={`Playback stops at ${
-                  new Date(state.sleepTimerEndsAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                }.`}
-                endContent={
-                  <Button
-                    label="Cancel"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => send({ type: "clearSleepTimer" })}
+            {state.sleepTimerEndsAt
+              ? (
+                <Banner
+                  status="info"
+                  title="Timer running"
+                  description={`Playback stops at ${
+                    formatTime(state.sleepTimerEndsAt)
+                  }.`}
+                  endContent={
+                    <Button
+                      label="Cancel"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => send({ type: "clearSleepTimer" })}
+                    />
+                  }
+                />
+              )
+              : (
+                <HStack gap={2} vAlign="center">
+                  <StatusDot
+                    variant="neutral"
+                    label="No sleep timer active"
                   />
-                }
-              />
-            )}
+                  <Text type="supporting" color="secondary">
+                    No timer running
+                  </Text>
+                </HStack>
+              )}
           </VStack>
-        </Card>
-        <Card padding={6}>
+        </Section>
+        <Section variant="muted" padding={6}>
           <form onSubmit={setAlarm}>
             <VStack gap={5}>
               <HStack hAlign="between" vAlign="start" gap={4}>
                 <VStack gap={2}>
                   <Text type="label" color="accent">Radio alarm</Text>
-                  <Heading level={2}>Wake the dial</Heading>
+                  <Heading level={2}>Wake up to</Heading>
                 </VStack>
                 <Icon icon={AlarmClock} color="accent" size="lg" />
               </HStack>
+              {state.alarm && (
+                <Banner
+                  status="success"
+                  title="Alarm ready"
+                  description={new Date(state.alarm.at).toLocaleString()}
+                  endContent={
+                    <Button
+                      label="Cancel"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => send({ type: "clearAlarm" })}
+                    />
+                  }
+                />
+              )}
               <DateTimeInput
                 label="Start time"
                 value={alarmAt}
@@ -138,31 +162,23 @@ export function ScheduleView({ state, stations, send, notify }: {
               />
               <Button
                 type="submit"
-                label="Set alarm"
+                label={state.alarm ? "Update alarm" : "Set alarm"}
                 icon={<Icon icon={AlarmClock} />}
                 isDisabled={!stations.length}
               />
-              {state.alarm && (
-                <Banner
-                  status="success"
-                  title="Radio alarm set"
-                  description={new Date(state.alarm.at).toLocaleString()}
-                  endContent={
-                    <Button
-                      label="Cancel"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => send({ type: "clearAlarm" })}
-                    />
-                  }
-                />
-              )}
             </VStack>
           </form>
-        </Card>
+        </Section>
       </Grid>
     </PageFrame>
   );
+}
+
+function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function toLocalDateTime(date: Date): ISODateTimeString {

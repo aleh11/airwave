@@ -17,6 +17,7 @@ Pi receives one binary and no JavaScript runtime.
 - Listening statistics
 - Sleep timer and one-time radio alarm
 - `mpv` output over a Unix socket
+- Bluetooth speaker and headphone discovery, pairing, and A2DP output selection
 - GPIO buttons through one `gpiomon` process with 50 ms software debounce
 - Native Astryx interface with Stone, Neutral, and Y2K themes plus light and
   dark modes
@@ -40,8 +41,8 @@ ICY metadata ───────────── command
 
 - Deno 2.9.3 or newer
 - macOS or Linux for development
-- 64-bit Raspberry Pi OS with `mpv` and `gpiod` for appliance playback and
-  buttons
+- 64-bit Raspberry Pi OS with `mpv`, BlueZ, BlueALSA, and `gpiod` for appliance
+  playback, Bluetooth audio, and buttons
 
 ## Develop
 
@@ -93,17 +94,18 @@ subprocess permissions are embedded in the executable. The frontend build under
 
 ## Configuration
 
-| Variable               | Default                  | Purpose                                   |
-| ---------------------- | ------------------------ | ----------------------------------------- |
-| `AIRWAVE_HOST`         | `127.0.0.1`              | HTTP bind address                         |
-| `AIRWAVE_PORT`         | `8787`                   | HTTP port                                 |
-| `AIRWAVE_DB_PATH`      | `./data/airwave.db`      | SQLite database path                      |
-| `AIRWAVE_WEB_ROOT`     | `./web/dist`             | Embedded/static frontend path             |
-| `AIRWAVE_MPV_COMMAND`  | `mpv`                    | `mpv` executable path                     |
-| `AIRWAVE_MPV_SOCKET`   | `/tmp/airwave-mpv.sock`  | `mpv` IPC socket                          |
-| `AIRWAVE_GPIO_CHIP`    | unset                    | GPIO chip; leaving it unset disables GPIO |
-| `AIRWAVE_GPIO_BIAS`    | `pull-up`                | `pull-up` or `external`                   |
-| `AIRWAVE_GPIO_BUTTONS` | standard four-button map | JSON map from line offsets to actions     |
+| Variable                       | Default                  | Purpose                                   |
+| ------------------------------ | ------------------------ | ----------------------------------------- |
+| `AIRWAVE_HOST`                 | `127.0.0.1`              | HTTP bind address                         |
+| `AIRWAVE_PORT`                 | `8787`                   | HTTP port                                 |
+| `AIRWAVE_DB_PATH`              | `./data/airwave.db`      | SQLite database path                      |
+| `AIRWAVE_WEB_ROOT`             | `./web/dist`             | Embedded/static frontend path             |
+| `AIRWAVE_MPV_COMMAND`          | `mpv`                    | `mpv` executable path                     |
+| `AIRWAVE_MPV_SOCKET`           | `/tmp/airwave-mpv.sock`  | `mpv` IPC socket                          |
+| `AIRWAVE_BLUETOOTHCTL_COMMAND` | `bluetoothctl`           | BlueZ control executable path             |
+| `AIRWAVE_GPIO_CHIP`            | unset                    | GPIO chip; leaving it unset disables GPIO |
+| `AIRWAVE_GPIO_BIAS`            | `pull-up`                | `pull-up` or `external`                   |
+| `AIRWAVE_GPIO_BUTTONS`         | standard four-button map | JSON map from line offsets to actions     |
 
 Supported GPIO actions are `toggle`, `next`, `volumeUp`, and `volumeDown`. Run
 `gpiodetect` on the Pi before setting `AIRWAVE_GPIO_CHIP`; Pi models and kernels
@@ -113,6 +115,25 @@ version and uses the matching 1.x or 2.x flags.
 Older `gpiomon` releases that cannot request internal bias are rejected when
 `AIRWAVE_GPIO_BIAS=pull-up`. Upgrade `gpiod`, or wire external pull-up resistors
 and set `AIRWAVE_GPIO_BIAS=external`.
+
+## Bluetooth audio API
+
+The appliance backend exposes Bluetooth management for a local settings UI:
+
+| Method   | Path                                     | Purpose                         |
+| -------- | ---------------------------------------- | ------------------------------- |
+| `GET`    | `/api/audio?audioOnly=true`              | List adapter and device state   |
+| `POST`   | `/api/audio/scan`                        | Scan for 3–30 seconds           |
+| `POST`   | `/api/audio/devices/:address/pair`       | Pair and trust a device         |
+| `POST`   | `/api/audio/devices/:address/connect`    | Connect and select A2DP output  |
+| `POST`   | `/api/audio/devices/:address/disconnect` | Disconnect a device             |
+| `DELETE` | `/api/audio/devices/:address`            | Forget a device                 |
+| `PUT`    | `/api/audio/output`                      | Select a paired output or local |
+
+Scan accepts `{ "seconds": 8, "audioOnly": true }`. Output selection accepts
+`{ "address": "AA:BB:CC:DD:EE:FF" }`, or `{ "address": null }` to return to the
+default local audio output. Headless pairing uses BlueZ's `NoInputNoOutput`
+agent and supports speakers and headphones that use confirmation-free pairing.
 
 ## Raspberry Pi deployment
 

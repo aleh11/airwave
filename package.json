@@ -1,9 +1,10 @@
 {
   "name": "airwave",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "astryx": {
-    "theme": "@astryxdesign/theme-stone"
+    "theme": "@astryxdesign/theme-neutral"
   },
   "scripts": {
     "build": "vite build web",
@@ -13,8 +14,6 @@
   "dependencies": {
     "@astryxdesign/core": "0.1.6",
     "@astryxdesign/theme-neutral": "0.1.6",
-    "@astryxdesign/theme-stone": "0.1.6",
-    "@astryxdesign/theme-y2k": "0.1.6",
     "@stylexjs/stylex": "0.19.0",
     "@vitejs/plugin-react": "6.0.3",
     "lucide-react": "1.25.0",

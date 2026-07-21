@@ -2,6 +2,11 @@ import { serveDir, serveFile } from "@std/http/file-server";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApiHandler } from "./api.ts";
+import {
+  bluealsaMpvDevice,
+  BluetoothManager,
+  isBluetoothAddress,
+} from "./bluetooth.ts";
 import { RadioDatabase } from "./db.ts";
 import { HistoryRecorder } from "./history.ts";
 import { GpioInput } from "./inputs/gpio.ts";
@@ -48,11 +53,37 @@ export async function startAirwave(): Promise<Deno.HttpServer> {
     Deno.env.get("AIRWAVE_MPV_COMMAND") ?? "mpv",
     Deno.env.get("AIRWAVE_MPV_SOCKET") ?? "/tmp/airwave-mpv.sock",
   );
+  const selectedAudioDevice = typeof settings.audioDeviceAddress === "string" &&
+      isBluetoothAddress(settings.audioDeviceAddress)
+    ? settings.audioDeviceAddress.toUpperCase()
+    : null;
+  if (selectedAudioDevice) {
+    await mpv.setAudioDevice(bluealsaMpvDevice(selectedAudioDevice));
+  }
+  const bluetooth = new BluetoothManager({
+    command: Deno.env.get("AIRWAVE_BLUETOOTHCTL_COMMAND") ?? "bluetoothctl",
+    selectedDeviceAddress: selectedAudioDevice,
+    onSelectedDeviceChange: (address) =>
+      database.setSetting("audioDeviceAddress", address),
+    onAudioDeviceChange: (address, name) =>
+      mpv.setAudioDevice(
+        address ? bluealsaMpvDevice(address) : null,
+        name,
+      ),
+  });
+  bluetooth.initialize().catch((error) =>
+    console.error(`Bluetooth audio unavailable: ${error.message}`)
+  );
   const gpio = createGpioInput(machine, database);
   gpio?.start().catch((error) =>
     console.error(`GPIO disabled: ${error.message}`)
   );
-  const api = createApiHandler(database, new RadioBrowserClient(), machine);
+  const api = createApiHandler(
+    database,
+    new RadioBrowserClient(),
+    machine,
+    bluetooth,
+  );
 
   const close = async () => {
     gpio?.close();

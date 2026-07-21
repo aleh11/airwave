@@ -76,3 +76,34 @@ export interface ListeningStats {
     nowPlaying: string | null;
   }>;
 }
+
+export interface VersionInfo {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+}
+
+export interface BluetoothDevice {
+  address: string;
+  name: string;
+  alias: string;
+  icon: string | null;
+  paired: boolean;
+  trusted: boolean;
+  connected: boolean;
+  blocked: boolean;
+  audioCapable: boolean;
+  uuids: string[];
+}
+
+export interface BluetoothAudioStatus {
+  available: boolean;
+  powered: boolean;
+  scanning: boolean;
+  adapterAddress: string | null;
+  adapterName: string | null;
+  selectedDeviceAddress: string | null;
+  devices: BluetoothDevice[];
+  error: string | null;
+}

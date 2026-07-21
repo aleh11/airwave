@@ -1,4 +1,10 @@
-import type { DiscoveryStation, ListeningStats, Station } from "./types.ts";
+import type {
+  BluetoothAudioStatus,
+  DiscoveryStation,
+  ListeningStats,
+  Station,
+  VersionInfo,
+} from "./types.ts";
 
 export interface StationDraft {
   name: string;
@@ -63,6 +69,80 @@ export async function discoverStations(query: {
 
 export async function getStats(): Promise<ListeningStats> {
   return await request<ListeningStats>("/api/stats");
+}
+
+export async function getVersion(): Promise<VersionInfo> {
+  return await request<VersionInfo>("/api/version");
+}
+
+export async function checkForUpdates(): Promise<VersionInfo> {
+  return await request<VersionInfo>("/api/version/check");
+}
+
+export async function getAudioStatus(
+  audioOnly = true,
+): Promise<BluetoothAudioStatus> {
+  return await request<BluetoothAudioStatus>(
+    `/api/audio?audioOnly=${audioOnly}`,
+  );
+}
+
+export async function scanAudioDevices(
+  seconds = 8,
+  audioOnly = true,
+): Promise<BluetoothAudioStatus> {
+  return await request<BluetoothAudioStatus>("/api/audio/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ seconds, audioOnly }),
+  });
+}
+
+export async function pairAudioDevice(
+  address: string,
+): Promise<BluetoothAudioStatus> {
+  return await audioDeviceAction(address, "pair");
+}
+
+export async function connectAudioDevice(
+  address: string,
+): Promise<BluetoothAudioStatus> {
+  return await audioDeviceAction(address, "connect");
+}
+
+export async function disconnectAudioDevice(
+  address: string,
+): Promise<BluetoothAudioStatus> {
+  return await audioDeviceAction(address, "disconnect");
+}
+
+export async function forgetAudioDevice(
+  address: string,
+): Promise<BluetoothAudioStatus> {
+  return await request<BluetoothAudioStatus>(
+    `/api/audio/devices/${address}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function selectAudioOutput(
+  address: string | null,
+): Promise<BluetoothAudioStatus> {
+  return await request<BluetoothAudioStatus>("/api/audio/output", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+}
+
+async function audioDeviceAction(
+  address: string,
+  action: "pair" | "connect" | "disconnect",
+): Promise<BluetoothAudioStatus> {
+  return await request<BluetoothAudioStatus>(
+    `/api/audio/devices/${address}/${action}`,
+    { method: "POST" },
+  );
 }
 
 async function request<T = unknown>(

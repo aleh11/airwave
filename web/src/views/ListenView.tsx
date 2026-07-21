@@ -1,5 +1,4 @@
 import { AspectRatio } from "@astryxdesign/core/AspectRatio";
-import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -17,31 +16,43 @@ import {
   LayoutHeader,
 } from "@astryxdesign/core/Layout";
 import { List } from "@astryxdesign/core/List";
+import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { Slider } from "@astryxdesign/core/Slider";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import {
+  Clock3,
   Compass,
   Heart,
+  History,
   Pause,
   Pencil,
   Play,
   Plus,
-  Radio,
+  RadioTower,
   SkipBack,
   SkipForward,
   Trash2,
 } from "lucide-react";
-import type { RadioState, Station } from "../types.ts";
-import { stationMetadata, StationThumbnail } from "../ui.tsx";
+import { useEffect, useState } from "react";
+import { getStats } from "../api.ts";
+import type { ListeningStats, RadioState, Station } from "../types.ts";
+import {
+  formatDuration,
+  type Notify,
+  stationMetadata,
+  StationThumbnail,
+} from "../ui.tsx";
 
 export function ListenView({
   state,
   stations,
   stationsLoading,
   role,
+  notify,
   onToggle,
   onPrevious,
   onNext,
@@ -57,6 +68,7 @@ export function ListenView({
   stations: Station[];
   stationsLoading: boolean;
   role: "player" | "remote";
+  notify: Notify;
   onToggle: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -68,43 +80,53 @@ export function ListenView({
   onAdd: () => void;
   onDiscover: () => void;
 }) {
+  const [stats, setStats] = useState<ListeningStats | null>(null);
+
+  useEffect(() => {
+    getStats().then(setStats).catch(() =>
+      notify("Listening history could not be loaded.", "error")
+    );
+  }, [state.revision, notify]);
+
   return (
     <Layout
       height="auto"
-      padding={6}
       content={
-        <VStack gap={4}>
-          {state.target === "appliance" &&
-            state.outputStatus.kind === "error" && (
-            <Banner
-              status="error"
-              title="Pi output unavailable"
-              description={state.outputStatus.message ||
-                "The audio output could not be started."}
-            />
-          )}
-          <Grid columns={{ minWidth: 340, max: 2 }} gap={5} align="stretch">
-            <NowPlayingCard
-              state={state}
-              role={role}
-              onToggle={onToggle}
-              onPrevious={onPrevious}
-              onNext={onNext}
-              onVolume={onVolume}
-            />
-            <StationLibrary
-              stations={stations}
-              activeId={state.station?.id}
-              loading={stationsLoading}
-              onSelect={onSelect}
-              onFavorite={onFavorite}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onAdd={onAdd}
-              onDiscover={onDiscover}
-            />
-          </Grid>
-        </VStack>
+        <LayoutContent padding={6}>
+          <HStack hAlign="center" vAlign="start" width="100%">
+            <VStack gap={5} maxWidth={1120} width="100%">
+              {state.target === "appliance" &&
+                state.outputStatus.kind === "error" && (
+                <Banner
+                  status="error"
+                  title="Pi output unavailable"
+                  description={state.outputStatus.message ||
+                    "The audio output could not be started."}
+                />
+              )}
+              <NowPlayingCard
+                state={state}
+                role={role}
+                onToggle={onToggle}
+                onPrevious={onPrevious}
+                onNext={onNext}
+                onVolume={onVolume}
+              />
+              <LibraryPanel
+                stations={stations}
+                activeId={state.station?.id}
+                loading={stationsLoading}
+                stats={stats}
+                onSelect={onSelect}
+                onFavorite={onFavorite}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onAdd={onAdd}
+                onDiscover={onDiscover}
+              />
+            </VStack>
+          </HStack>
+        </LayoutContent>
       }
     />
   );
@@ -120,111 +142,101 @@ function NowPlayingCard(
     onVolume: (volume: number) => void;
   },
 ) {
-  const title = state.station?.name || "No station selected";
+  const title = state.station?.name || "Choose a station";
   return (
-    <Card padding={0} variant="muted">
-      <Layout
-        height="auto"
-        header={
-          <LayoutHeader padding={5} hasDivider>
-            <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
-              <HStack gap={2} vAlign="center">
-                <StatusDot
-                  variant={state.playing ? "success" : "neutral"}
-                  label={state.playing ? "Live" : "Stopped"}
-                  isPulsing={state.playing}
-                />
-                <Text type="label">Now playing</Text>
-              </HStack>
-              <Badge
-                variant="info"
-                label={state.target === "browser"
-                  ? "Browser output"
-                  : "Pi output"}
+    <Card padding={5} variant="muted">
+      <VStack gap={5}>
+        <HStack gap={3} hAlign="between" vAlign="center">
+          <VStack gap={1}>
+            <Text type="label" color="accent">Now playing</Text>
+            <StatusDot
+              variant={state.playing ? "success" : "neutral"}
+              label={state.playing ? "Live signal" : "Receiver ready"}
+              isPulsing={state.playing}
+            />
+          </VStack>
+          <Icon icon={RadioTower} color="accent" size="lg" />
+        </HStack>
+        <Grid columns={{ minWidth: 260, max: 2 }} gap={5} align="center">
+          <VStack width="100%" maxWidth={220} hAlign="center">
+            <AspectRatio ratio={1} fit="cover">
+              {state.station?.favicon
+                ? (
+                  <img
+                    src={state.station.favicon}
+                    alt={`${title} artwork`}
+                  />
+                )
+                : (
+                  <Card padding={8} variant="gray">
+                    <VStack hAlign="center" vAlign="center" height="100%">
+                      <Icon icon={RadioTower} color="accent" size="lg" />
+                    </VStack>
+                  </Card>
+                )}
+            </AspectRatio>
+          </VStack>
+          <VStack gap={4}>
+            <VStack gap={2}>
+              <Heading level={1} type="display-3" textWrap="balance">
+                {title}
+              </Heading>
+              <Text color="secondary" maxLines={2}>
+                {state.nowPlaying ||
+                  (state.station
+                    ? stationMetadata(state.station)
+                    : "Pick a preset or discover a new frequency.")}
+              </Text>
+              <Text type="supporting" color="secondary">
+                {state.target === "browser" && role === "remote"
+                  ? "Controlled here, playing in another browser"
+                  : state.target === "appliance"
+                  ? state.outputStatus.message || "Playing through the Pi"
+                  : "Playing in this browser"}
+              </Text>
+            </VStack>
+            <HStack gap={3} vAlign="center">
+              <IconButton
+                label="Previous favorite"
+                variant="secondary"
+                icon={<Icon icon={SkipBack} />}
+                onClick={onPrevious}
+              />
+              <IconButton
+                label={state.playing ? "Pause" : "Play"}
+                variant="primary"
+                size="lg"
+                icon={<Icon icon={state.playing ? Pause : Play} />}
+                onClick={onToggle}
+              />
+              <IconButton
+                label="Next favorite"
+                variant="secondary"
+                icon={<Icon icon={SkipForward} />}
+                onClick={onNext}
               />
             </HStack>
-          </LayoutHeader>
-        }
-        content={
-          <LayoutContent padding={6}>
-            <Grid columns={2} gap={6} align="center">
-              <AspectRatio ratio={1} fit="cover">
-                {state.station?.favicon
-                  ? <img src={state.station.favicon} alt={`${title} artwork`} />
-                  : (
-                    <Card padding={8} variant="gray">
-                      <VStack hAlign="center" vAlign="center" height="100%">
-                        <Icon icon={Radio} color="accent" size="lg" />
-                      </VStack>
-                    </Card>
-                  )}
-              </AspectRatio>
-              <VStack gap={5}>
-                <VStack gap={2}>
-                  <Text type="label" color="accent">
-                    {state.playing ? "On air" : "Receiver ready"}
-                  </Text>
-                  <Heading level={1} type="display-2" textWrap="balance">
-                    {title}
-                  </Heading>
-                  <Text color="secondary" maxLines={2}>
-                    {state.nowPlaying ||
-                      (state.station
-                        ? stationMetadata(state.station)
-                        : "Choose a preset from your station library.")}
-                  </Text>
-                  <Text type="supporting" color="secondary">
-                    {state.target === "browser" && role === "remote"
-                      ? "Another browser owns playback"
-                      : state.target === "appliance"
-                      ? state.outputStatus.message ||
-                        "Raspberry Pi audio output"
-                      : "This browser owns playback"}
-                  </Text>
-                </VStack>
-                <HStack gap={3} vAlign="center" hAlign="center">
-                  <IconButton
-                    label="Previous favorite"
-                    variant="secondary"
-                    icon={<Icon icon={SkipBack} />}
-                    onClick={onPrevious}
-                  />
-                  <IconButton
-                    label={state.playing ? "Pause" : "Play"}
-                    variant="primary"
-                    size="lg"
-                    icon={<Icon icon={state.playing ? Pause : Play} />}
-                    onClick={onToggle}
-                  />
-                  <IconButton
-                    label="Next favorite"
-                    variant="secondary"
-                    icon={<Icon icon={SkipForward} />}
-                    onClick={onNext}
-                  />
-                </HStack>
-                <Slider
-                  label="Volume"
-                  min={0}
-                  max={100}
-                  value={state.volume}
-                  valueDisplay="text"
-                  formatValue={(value) => `${value}%`}
-                  onChange={onVolume}
-                />
-              </VStack>
-            </Grid>
-          </LayoutContent>
-        }
-      />
+          </VStack>
+        </Grid>
+        <Slider
+          label="Volume"
+          min={0}
+          max={100}
+          value={state.volume}
+          valueDisplay="text"
+          formatValue={(value) => `${value}%`}
+          onChange={onVolume}
+        />
+      </VStack>
     </Card>
   );
 }
 
-function StationLibrary({
+function LibraryPanel({
   stations,
   activeId,
   loading,
+  stats,
   onSelect,
   onFavorite,
   onEdit,
@@ -235,6 +247,7 @@ function StationLibrary({
   stations: Station[];
   activeId?: number;
   loading: boolean;
+  stats: ListeningStats | null;
   onSelect: (station: Station) => void;
   onFavorite: (station: Station) => void;
   onEdit: (station: Station) => void;
@@ -242,118 +255,254 @@ function StationLibrary({
   onAdd: () => void;
   onDiscover: () => void;
 }) {
+  const [tab, setTab] = useState("presets");
   return (
     <Card padding={0}>
       <Layout
         height="auto"
         header={
-          <LayoutHeader padding={5} hasDivider>
-            <HStack hAlign="between" vAlign="center" gap={3}>
-              <VStack gap={1}>
-                <Text type="label" color="accent">Presets</Text>
-                <Heading level={2}>Station library</Heading>
-              </VStack>
-              <IconButton
-                label="Add custom station"
-                icon={<Icon icon={Plus} />}
-                variant="secondary"
-                onClick={onAdd}
-              />
+          <LayoutHeader padding={4} hasDivider>
+            <HStack hAlign="between" vAlign="center" gap={3} wrap="wrap">
+              <TabList
+                value={tab}
+                onChange={setTab}
+                size="sm"
+                aria-label="Listen details"
+              >
+                <Tab
+                  value="presets"
+                  label="Presets"
+                  icon={<Icon icon={RadioTower} size="sm" />}
+                />
+                <Tab
+                  value="history"
+                  label="History"
+                  icon={<Icon icon={History} size="sm" />}
+                />
+              </TabList>
+              {tab === "presets" && (
+                <IconButton
+                  label="Add custom station"
+                  icon={<Icon icon={Plus} />}
+                  variant="secondary"
+                  onClick={onAdd}
+                />
+              )}
             </HStack>
           </LayoutHeader>
         }
         content={
           <LayoutContent padding={0}>
-            {loading
+            {tab === "presets"
               ? (
-                <VStack gap={3} padding={5}>
-                  {[0, 1, 2, 3].map((index) => (
-                    <HStack gap={3} vAlign="center" key={index}>
-                      <Skeleton
-                        width={48}
-                        height={48}
-                        radius={2}
-                        index={index}
-                      />
-                      <VStack gap={2} width="100%">
-                        <Skeleton width="60%" height={14} index={index} />
-                        <Skeleton width="35%" height={10} index={index} />
-                      </VStack>
-                    </HStack>
-                  ))}
-                </VStack>
-              )
-              : stations.length
-              ? (
-                <List hasDividers density="compact">
-                  {stations.map((station) => (
-                    <Item
-                      key={station.id}
-                      as="li"
-                      density="compact"
-                      isSelected={station.id === activeId}
-                      startContent={<StationThumbnail station={station} />}
-                      label={station.name}
-                      description={stationMetadata(station)}
-                      onClick={() => onSelect(station)}
-                      endContent={
-                        <HStack gap={1}>
-                          <IconButton
-                            label={station.favorite
-                              ? "Remove favorite"
-                              : "Add favorite"}
-                            variant="ghost"
-                            size="sm"
-                            icon={
-                              <Icon
-                                icon={Heart}
-                                color={station.favorite ? "error" : "secondary"}
-                                size="sm"
-                              />
-                            }
-                            onClick={() => onFavorite(station)}
-                          />
-                          <IconButton
-                            label="Edit station"
-                            variant="ghost"
-                            size="sm"
-                            icon={<Icon icon={Pencil} size="sm" />}
-                            onClick={() => onEdit(station)}
-                          />
-                          <IconButton
-                            label="Delete station"
-                            variant="ghost"
-                            size="sm"
-                            icon={<Icon icon={Trash2} size="sm" />}
-                            onClick={() => onDelete(station)}
-                          />
-                        </HStack>
-                      }
-                    />
-                  ))}
-                </List>
-              )
-              : (
-                <EmptyState
-                  isCompact
-                  icon={<Icon icon={Radio} color="accent" />}
-                  title="No presets yet"
-                  description="Find a station in the open radio directory."
+                <PresetList
+                  stations={stations}
+                  activeId={activeId}
+                  loading={loading}
+                  onSelect={onSelect}
+                  onFavorite={onFavorite}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
                 />
-              )}
+              )
+              : <ListeningHistory stats={stats} />}
           </LayoutContent>
         }
-        footer={
-          <LayoutFooter padding={4} hasDivider>
-            <Button
-              label="Discover more stations"
-              variant="ghost"
-              icon={<Icon icon={Compass} />}
-              onClick={onDiscover}
-            />
-          </LayoutFooter>
-        }
+        footer={tab === "presets"
+          ? (
+            <LayoutFooter padding={4} hasDivider>
+              <Button
+                label="Discover stations"
+                variant="ghost"
+                icon={<Icon icon={Compass} />}
+                onClick={onDiscover}
+              />
+            </LayoutFooter>
+          )
+          : undefined}
       />
     </Card>
+  );
+}
+
+function PresetList({
+  stations,
+  activeId,
+  loading,
+  onSelect,
+  onFavorite,
+  onEdit,
+  onDelete,
+}: {
+  stations: Station[];
+  activeId?: number;
+  loading: boolean;
+  onSelect: (station: Station) => void;
+  onFavorite: (station: Station) => void;
+  onEdit: (station: Station) => void;
+  onDelete: (station: Station) => void;
+}) {
+  if (loading) {
+    return (
+      <VStack gap={3} padding={5}>
+        {[0, 1, 2, 3].map((index) => (
+          <HStack gap={3} vAlign="center" key={index}>
+            <Skeleton width={48} height={48} radius={2} index={index} />
+            <VStack gap={2} width="100%">
+              <Skeleton width="60%" height={14} index={index} />
+              <Skeleton width="35%" height={10} index={index} />
+            </VStack>
+          </HStack>
+        ))}
+      </VStack>
+    );
+  }
+  if (!stations.length) {
+    return (
+      <EmptyState
+        isCompact
+        icon={<Icon icon={RadioTower} color="accent" />}
+        title="No presets yet"
+        description="Find a station in the open radio directory."
+      />
+    );
+  }
+  return (
+    <List hasDividers density="balanced">
+      {stations.map((station) => (
+        <Item
+          key={station.id}
+          as="li"
+          density="balanced"
+          isSelected={station.id === activeId}
+          startContent={<StationThumbnail station={station} />}
+          label={station.name}
+          description={stationMetadata(station)}
+          endContent={
+            <HStack gap={1}>
+              <IconButton
+                label={`Play ${station.name}`}
+                variant={station.id === activeId ? "primary" : "ghost"}
+                size="sm"
+                icon={<Icon icon={Play} size="sm" />}
+                onClick={() => onSelect(station)}
+              />
+              <IconButton
+                label={station.favorite ? "Remove favorite" : "Add favorite"}
+                variant="ghost"
+                size="sm"
+                icon={
+                  <Icon
+                    icon={Heart}
+                    color={station.favorite ? "error" : "secondary"}
+                    size="sm"
+                  />
+                }
+                onClick={() => onFavorite(station)}
+              />
+              <MoreMenu
+                label={`More actions for ${station.name}`}
+                size="sm"
+                items={[
+                  {
+                    label: "Edit station",
+                    icon: Pencil,
+                    onClick: () => onEdit(station),
+                  },
+                  { type: "divider" },
+                  {
+                    label: "Delete station",
+                    icon: Trash2,
+                    onClick: () => onDelete(station),
+                  },
+                ]}
+              />
+            </HStack>
+          }
+        />
+      ))}
+    </List>
+  );
+}
+
+function ListeningHistory({ stats }: { stats: ListeningStats | null }) {
+  if (!stats) {
+    return (
+      <VStack gap={3} padding={5}>
+        {[0, 1, 2].map((index) => (
+          <Skeleton key={index} width="100%" height={40} index={index} />
+        ))}
+      </VStack>
+    );
+  }
+  return (
+    <VStack gap={5} padding={5}>
+      <Grid columns={{ minWidth: 100, max: 3 }} gap={4}>
+        <HistoryMetric
+          label="Listening"
+          value={formatDuration(stats.totalListeningSeconds)}
+          icon={Clock3}
+        />
+        <HistoryMetric
+          label="Sessions"
+          value={String(stats.totalPlays)}
+          icon={History}
+        />
+        <HistoryMetric
+          label="Stations"
+          value={String(stats.uniqueStations)}
+          icon={RadioTower}
+        />
+      </Grid>
+      {stats.recent.length
+        ? (
+          <List hasDividers density="compact">
+            {stats.recent.slice(0, 8).map((entry) => (
+              <Item
+                key={entry.id}
+                as="li"
+                density="compact"
+                marker={
+                  <StatusDot
+                    variant={entry.endedAt ? "neutral" : "success"}
+                    label={entry.endedAt ? "Ended" : "Playing"}
+                  />
+                }
+                label={entry.stationName}
+                description={entry.nowPlaying ||
+                  new Date(entry.startedAt).toLocaleString()}
+                endContent={
+                  <Text type="supporting" color="secondary" hasTabularNumbers>
+                    {formatDuration(entry.durationSeconds)}
+                  </Text>
+                }
+              />
+            ))}
+          </List>
+        )
+        : (
+          <EmptyState
+            isCompact
+            title="No listening history yet"
+            description="Your recent stations will appear here."
+          />
+        )}
+    </VStack>
+  );
+}
+
+function HistoryMetric({ label, value, icon }: {
+  label: string;
+  value: string;
+  icon: typeof Clock3;
+}) {
+  return (
+    <VStack gap={2}>
+      <HStack gap={2} vAlign="center">
+        <Icon icon={icon} color="accent" size="sm" />
+        <Text type="supporting" color="secondary">{label}</Text>
+      </HStack>
+      <Heading level={3}>{value}</Heading>
+    </VStack>
   );
 }

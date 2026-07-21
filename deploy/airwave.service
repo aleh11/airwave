@@ -1,13 +1,13 @@
 [Unit]
 Description=Airwave internet radio
-Wants=network-online.target
-After=network-online.target sound.target
+Wants=network-online.target bluetooth.service bluealsa.service
+After=network-online.target sound.target bluetooth.service bluealsa.service
 
 [Service]
 Type=simple
 User=airwave
 Group=airwave
-SupplementaryGroups=audio gpio
+SupplementaryGroups=audio gpio bluetooth
 EnvironmentFile=/etc/airwave.env
 RuntimeDirectory=airwave
 StateDirectory=airwave
@@ -25,4 +25,3 @@ LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target
-

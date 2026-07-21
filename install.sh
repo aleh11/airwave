@@ -186,21 +186,23 @@ verify_release() {
 install_packages() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y --no-install-recommends mpv gpiod ca-certificates
+  apt-get install -y --no-install-recommends \
+    mpv gpiod ca-certificates bluez bluez-alsa-utils
 }
 
 prepare_service_account() {
   getent group "${service_user}" >/dev/null 2>&1 || groupadd --system "${service_user}"
   getent group audio >/dev/null 2>&1 || groupadd --system audio
   getent group gpio >/dev/null 2>&1 || groupadd --system gpio
+  getent group bluetooth >/dev/null 2>&1 || groupadd --system bluetooth
 
   if id "${service_user}" >/dev/null 2>&1; then
-    usermod --gid "${service_user}" --append --groups audio,gpio "${service_user}"
+    usermod --gid "${service_user}" --append --groups audio,gpio,bluetooth "${service_user}"
   else
     useradd \
       --system \
       --gid "${service_user}" \
-      --groups audio,gpio \
+      --groups audio,gpio,bluetooth \
       --home-dir "/var/lib/${service_name}" \
       --shell /usr/sbin/nologin \
       "${service_user}"
@@ -219,6 +221,7 @@ install_service_files() {
       printf 'AIRWAVE_DB_PATH=%s\n' "/var/lib/${service_name}/airwave.db"
       printf 'AIRWAVE_MPV_COMMAND=%s\n' "/usr/bin/mpv"
       printf 'AIRWAVE_MPV_SOCKET=%s\n' "/run/${service_name}/mpv.sock"
+      printf 'AIRWAVE_BLUETOOTHCTL_COMMAND=%s\n' "/usr/bin/bluetoothctl"
       printf 'AIRWAVE_GPIO_CHIP=%s\n' "${gpio_chip}"
       printf 'AIRWAVE_GPIO_BIAS=%s\n' "${AIRWAVE_GPIO_BIAS:-pull-up}"
       printf "AIRWAVE_GPIO_BUTTONS='%s'\n" "${AIRWAVE_GPIO_BUTTONS:-{\"17\":\"toggle\",\"27\":\"next\",\"22\":\"volumeUp\",\"23\":\"volumeDown\"}}"
@@ -228,14 +231,14 @@ install_service_files() {
   cat > "${service_path}" <<'UNIT'
 [Unit]
 Description=Airwave internet radio
-Wants=network-online.target
-After=network-online.target sound.target
+Wants=network-online.target bluetooth.service bluealsa.service
+After=network-online.target sound.target bluetooth.service bluealsa.service
 
 [Service]
 Type=simple
 User=airwave
 Group=airwave
-SupplementaryGroups=audio gpio
+SupplementaryGroups=audio gpio bluetooth
 EnvironmentFile=/etc/airwave.env
 RuntimeDirectory=airwave
 StateDirectory=airwave
@@ -258,6 +261,7 @@ UNIT
 
 start_airwave() {
   systemctl daemon-reload
+  systemctl enable --now bluetooth.service bluealsa.service >/dev/null
   systemctl enable "${service_name}" >/dev/null
   systemctl restart "${service_name}"
 
@@ -324,7 +328,7 @@ else
 fi
 
 run_step "Verified release integrity" verify_release
-run_step "Installed audio and GPIO packages" install_packages
+run_step "Installed audio, Bluetooth, and GPIO packages" install_packages
 run_step "Prepared the restricted service account" prepare_service_account
 
 gpio_chip="${AIRWAVE_GPIO_CHIP:-}"

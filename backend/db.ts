@@ -12,6 +12,7 @@ export interface PersistedSettings {
   volume?: number;
   target?: PlaybackTarget;
   alarm?: Alarm | null;
+  audioDeviceAddress?: string | null;
 }
 
 interface StationRow {
@@ -192,6 +193,9 @@ export class RadioDatabase {
         }
         if (row.key === "target") settings.target = JSON.parse(row.value);
         if (row.key === "alarm") settings.alarm = JSON.parse(row.value);
+        if (row.key === "audioDeviceAddress") {
+          settings.audioDeviceAddress = JSON.parse(row.value);
+        }
       } catch {
         continue;
       }
@@ -199,7 +203,10 @@ export class RadioDatabase {
     return settings;
   }
 
-  setSetting(key: "volume" | "target" | "alarm", value: unknown): void {
+  setSetting(
+    key: "volume" | "target" | "alarm" | "audioDeviceAddress",
+    value: unknown,
+  ): void {
     this.#db.prepare(`
       INSERT INTO settings (key, value) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value

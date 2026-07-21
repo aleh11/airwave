@@ -51,7 +51,7 @@ Deno.test("history produces truthful listening statistics", async () => {
   }
 });
 
-Deno.test("volume, target, and alarm settings round-trip", async () => {
+Deno.test("receiver settings round-trip", async () => {
   const database = await RadioDatabase.open(":memory:");
   try {
     database.setSetting("volume", 44);
@@ -60,10 +60,12 @@ Deno.test("volume, target, and alarm settings round-trip", async () => {
       at: "2026-07-21T06:30:00.000Z",
       stationId: 2,
     });
+    database.setSetting("audioDeviceAddress", "AA:BB:CC:DD:EE:FF");
     assertEquals(database.getSettings(), {
       volume: 44,
       target: "appliance",
       alarm: { at: "2026-07-21T06:30:00.000Z", stationId: 2 },
+      audioDeviceAddress: "AA:BB:CC:DD:EE:FF",
     });
   } finally {
     database.close();

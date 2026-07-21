@@ -1,8 +1,9 @@
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
-import { Layout, LayoutContent, LayoutHeader } from "@astryxdesign/core/Layout";
+import { Layout, LayoutContent } from "@astryxdesign/core/Layout";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Text } from "@astryxdesign/core/Text";
 import { Thumbnail } from "@astryxdesign/core/Thumbnail";
@@ -22,24 +23,24 @@ export function PageFrame({ eyebrow, title, description, children }: {
   return (
     <Layout
       height="auto"
-      header={
-        <LayoutHeader hasDivider padding={6}>
-          <VStack gap={2}>
-            <Text type="label" color="accent">
-              {eyebrow}
-            </Text>
-            <Heading level={1} type="display-2" textWrap="balance">
-              {title}
-            </Heading>
-            <Text color="secondary" textWrap="balance">
-              {description}
-            </Text>
-          </VStack>
-        </LayoutHeader>
-      }
       content={
         <LayoutContent padding={6}>
-          <VStack gap={6}>{children}</VStack>
+          <HStack hAlign="center" vAlign="start" width="100%">
+            <VStack gap={6} maxWidth={1200} width="100%">
+              <VStack gap={2}>
+                <Text type="label" color="accent">
+                  {eyebrow}
+                </Text>
+                <Heading level={1} type="display-3" textWrap="balance">
+                  {title}
+                </Heading>
+                <Text color="secondary" textWrap="balance">
+                  {description}
+                </Text>
+              </VStack>
+              {children}
+            </VStack>
+          </HStack>
         </LayoutContent>
       }
     />

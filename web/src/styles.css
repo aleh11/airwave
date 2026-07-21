@@ -1,5 +1,37 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
-@import "@astryxdesign/theme-neutral/theme.css";
-@import "@astryxdesign/theme-stone/theme.css";
-@import "@astryxdesign/theme-y2k/theme.css";
+
+.airwave-output-switcher {
+  padding: var(--spacing-1);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-page);
+  background: color-mix(
+    in srgb,
+    var(--color-background-surface) 92%,
+    transparent
+  );
+  box-shadow: var(--shadow-low);
+  backdrop-filter: blur(var(--spacing-2));
+}
+
+.airwave-output-switcher svg {
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
+
+.airwave-output-bar {
+  flex-shrink: 0;
+  padding-block-start: var(--spacing-3);
+  padding-inline: var(--spacing-6);
+}
+
+@media (max-width: 640px) {
+  .airwave-output-bar {
+    padding-block-start: var(--spacing-2);
+    padding-inline: var(--spacing-4);
+  }
+
+  .astryx-date-time-input {
+    flex-direction: column;
+  }
+}

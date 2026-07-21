@@ -1,20 +1,30 @@
+import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
-import { Card } from "@astryxdesign/core/Card";
-import { Grid } from "@astryxdesign/core/Grid";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { Item } from "@astryxdesign/core/Item";
-import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { List } from "@astryxdesign/core/List";
+import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
-import { Play, Save, Search } from "lucide-react";
+import {
+  Play,
+  RadioTower,
+  Save,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { createStation, discoverStations } from "../api.ts";
 import type { DiscoveryStation, Station } from "../types.ts";
 import {
-  EmptyPanel,
   errorMessage,
   type Notify,
   PageFrame,
@@ -22,27 +32,52 @@ import {
   StationThumbnail,
 } from "../ui.tsx";
 
+type SearchScope = "station" | "genre" | "country";
+
+const scopeOptions = [
+  { value: "station", label: "Station name" },
+  { value: "genre", label: "Genre" },
+  { value: "country", label: "Country code" },
+];
+
+const suggestions: Array<{ label: string; value: string; scope: SearchScope }> =
+  [
+    { label: "Jazz", value: "jazz", scope: "genre" },
+    { label: "News", value: "news", scope: "genre" },
+    { label: "Ambient", value: "ambient", scope: "genre" },
+    { label: "Classical", value: "classical", scope: "genre" },
+    { label: "South Africa", value: "ZA", scope: "country" },
+  ];
+
 export function DiscoverView({ savedStations, onSaved, onPlay, notify }: {
   savedStations: Station[];
   onSaved: () => Promise<void>;
   onPlay: (station: Station) => void;
   notify: Notify;
 }) {
-  const [query, setQuery] = useState({ name: "", tag: "", country: "" });
+  const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<SearchScope>("station");
   const [results, setResults] = useState<DiscoveryStation[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
   const [searching, setSearching] = useState(false);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const savedUrls = new Set(savedStations.map((station) => station.url));
 
-  const search = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!query.name.trim() && !query.tag.trim() && !query.country.trim()) {
-      notify("Enter a station name, tag, or country to search.", "error");
+  const runSearch = async (term: string, nextScope: SearchScope) => {
+    if (!term.trim()) {
+      notify("Enter something to search for.", "error");
       return;
     }
     setSearching(true);
+    setHasSearched(true);
     try {
-      setResults(await discoverStations(query));
+      setResults(
+        await discoverStations({
+          name: nextScope === "station" ? term : "",
+          tag: nextScope === "genre" ? term : "",
+          country: nextScope === "country" ? term : "",
+        }),
+      );
     } catch (error) {
       notify(errorMessage(error), "error");
     } finally {
@@ -50,11 +85,22 @@ export function DiscoverView({ savedStations, onSaved, onPlay, notify }: {
     }
   };
 
+  const search = (event: FormEvent) => {
+    event.preventDefault();
+    runSearch(query, scope);
+  };
+
+  const searchSuggestion = (value: string, nextScope: SearchScope) => {
+    setQuery(value);
+    setScope(nextScope);
+    runSearch(value, nextScope);
+  };
+
   const save = async (station: DiscoveryStation, play: boolean) => {
     const existing = savedStations.find((saved) => saved.url === station.url);
     if (existing) {
       if (play) onPlay(existing);
-      else notify(`${existing.name} is already in your library.`);
+      else notify(`${existing.name} is already in your presets.`);
       return;
     }
     setSavingUrl(station.url);
@@ -72,95 +118,108 @@ export function DiscoverView({ savedStations, onSaved, onPlay, notify }: {
 
   return (
     <PageFrame
-      eyebrow="Open directory"
-      title="Find a new frequency"
-      description="Search thousands of community-maintained streams by name, sound, or country."
+      eyebrow="Open radio directory"
+      title="Discover"
+      description="Find a station by name, genre, or country and save it as a preset."
     >
-      <Card padding={5}>
+      <Section variant="muted" padding={5}>
         <form onSubmit={search}>
-          <Grid columns={{ minWidth: 180, max: 4 }} gap={4} align="end">
-            <TextInput
-              label="Station name"
-              value={query.name}
-              placeholder="e.g. NTS"
-              hasClear
-              onChange={(name) => setQuery({ ...query, name })}
-            />
-            <TextInput
-              label="Genre or tag"
-              value={query.tag}
-              placeholder="e.g. jazz"
-              hasClear
-              onChange={(tag) => setQuery({ ...query, tag })}
-            />
-            <TextInput
-              label="Country code"
-              value={query.country}
-              placeholder="ZA"
-              hasClear
-              onChange={(country) => setQuery({ ...query, country })}
-            />
-            <Button
-              type="submit"
-              label={searching ? "Tuning…" : "Search"}
-              icon={<Icon icon={Search} />}
-              isLoading={searching}
-            />
-          </Grid>
+          <VStack gap={4}>
+            <HStack gap={3} vAlign="end" wrap="wrap">
+              <TextInput
+                label="Search stations"
+                value={query}
+                placeholder={scope === "station"
+                  ? "Try NTS, KEXP, or Radio Paradise"
+                  : scope === "genre"
+                  ? "Try jazz, ambient, or news"
+                  : "Try ZA, GB, or JP"}
+                startIcon={<Icon icon={Search} size="sm" />}
+                hasClear
+                width="100%"
+                onChange={setQuery}
+              />
+              <Selector
+                label="Search by"
+                value={scope}
+                options={scopeOptions}
+                startIcon={<Icon icon={SlidersHorizontal} size="sm" />}
+                onChange={(value) => setScope(value as SearchScope)}
+              />
+              <Button
+                type="submit"
+                label={searching ? "Searching…" : "Search"}
+                icon={<Icon icon={Search} />}
+                isLoading={searching}
+              />
+            </HStack>
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              <Text type="supporting" color="secondary">Try</Text>
+              {suggestions.map((suggestion) => (
+                <Button
+                  key={suggestion.label}
+                  label={suggestion.label}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    searchSuggestion(suggestion.value, suggestion.scope)}
+                />
+              ))}
+            </HStack>
+          </VStack>
         </form>
-      </Card>
-      {searching
+      </Section>
+      {searching ? <DiscoverySkeleton /> : results.length
         ? (
-          <Grid columns={{ minWidth: 260, max: 3 }} gap={4}>
-            {[0, 1, 2, 3, 4, 5].map((index) => (
-              <Card padding={5} key={index}>
-                <HStack gap={4} vAlign="center">
-                  <Skeleton width={56} height={56} radius={2} index={index} />
-                  <VStack gap={2} width="100%">
-                    <Skeleton width="70%" height={16} index={index} />
-                    <Skeleton width="45%" height={12} index={index} />
-                  </VStack>
-                </HStack>
-              </Card>
-            ))}
-          </Grid>
-        )
-        : results.length
-        ? (
-          <Grid columns={{ minWidth: 280, max: 3 }} gap={4} align="stretch">
-            {results.map((station) => {
-              const saved = savedUrls.has(station.url);
-              const busy = savingUrl === station.url;
-              return (
-                <Card padding={0} key={station.externalId || station.url}>
-                  <Layout
-                    height="auto"
-                    content={
-                      <LayoutContent padding={5}>
-                        <Item
-                          startContent={<StationThumbnail station={station} />}
-                          label={station.name}
-                          description={`${stationMetadata(station)}\n${
-                            station.tags.slice(0, 5).join(" · ")
-                          }`}
-                          labelLines={1}
-                          descriptionLines={2}
-                        />
-                      </LayoutContent>
-                    }
-                    footer={
-                      <LayoutFooter hasDivider padding={4}>
-                        <HStack gap={2} hAlign="end" wrap="wrap">
-                          <Button
-                            label="Play now"
+          <VStack gap={3}>
+            <HStack hAlign="between" vAlign="center">
+              <Heading level={2}>Stations in range</Heading>
+              <Badge label={results.length} variant="neutral" />
+            </HStack>
+            <Section padding={0}>
+              <List hasDividers density="spacious">
+                {results.map((station) => {
+                  const saved = savedUrls.has(station.url);
+                  const busy = savingUrl === station.url;
+                  return (
+                    <Item
+                      key={station.externalId || station.url}
+                      as="li"
+                      align="start"
+                      density="spacious"
+                      startContent={<StationThumbnail station={station} />}
+                      label={station.name}
+                      description={
+                        <VStack gap={1}>
+                          <Text type="supporting" color="secondary">
+                            {stationMetadata(station)}
+                          </Text>
+                          {station.tags.length > 0 && (
+                            <Text
+                              type="supporting"
+                              color="secondary"
+                              maxLines={1}
+                            >
+                              {station.tags.slice(0, 5).join(" · ")}
+                            </Text>
+                          )}
+                        </VStack>
+                      }
+                      endContent={
+                        <HStack gap={1}>
+                          <IconButton
+                            label={`Play ${station.name}`}
                             variant="secondary"
                             size="sm"
                             icon={<Icon icon={Play} size="sm" />}
                             isDisabled={busy}
                             onClick={() => save(station, true)}
                           />
-                          <Button
-                            label={saved ? "Saved" : "Save preset"}
+                          <IconButton
+                            label={saved
+                              ? `${station.name} is saved`
+                              : `Save ${station.name}`}
+                            variant={saved ? "secondary" : "primary"}
                             size="sm"
                             icon={<Icon icon={Save} size="sm" />}
                             isDisabled={saved}
@@ -168,20 +227,43 @@ export function DiscoverView({ savedStations, onSaved, onPlay, notify }: {
                             onClick={() => save(station, false)}
                           />
                         </HStack>
-                      </LayoutFooter>
-                    }
-                  />
-                </Card>
-              );
-            })}
-          </Grid>
+                      }
+                    />
+                  );
+                })}
+              </List>
+            </Section>
+          </VStack>
         )
         : (
-          <EmptyPanel
-            title="The dial is open"
-            description="Search to bring stations into range."
-          />
+          <Section padding={8}>
+            <EmptyState
+              icon={<Icon icon={RadioTower} color="accent" size="lg" />}
+              title={hasSearched ? "No stations found" : "The dial is open"}
+              description={hasSearched
+                ? "Try a broader term or search by a different field."
+                : "Search above or start with one of the suggestions."}
+            />
+          </Section>
         )}
     </PageFrame>
+  );
+}
+
+function DiscoverySkeleton() {
+  return (
+    <Section padding={5}>
+      <VStack gap={4}>
+        {[0, 1, 2, 3, 4].map((index) => (
+          <HStack gap={4} vAlign="center" key={index}>
+            <Skeleton width={48} height={48} radius={2} index={index} />
+            <VStack gap={2} width="100%">
+              <Skeleton width="55%" height={16} index={index} />
+              <Skeleton width="35%" height={12} index={index} />
+            </VStack>
+          </HStack>
+        ))}
+      </VStack>
+    </Section>
   );
 }

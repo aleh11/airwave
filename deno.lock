@@ -18,8 +18,6 @@
     "npm:@astryxdesign/cli@0.1.6": "0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_@astryxdesign+theme-neutral@0.1.6__@astryxdesign+core@0.1.6___@stylexjs+stylex@0.19.0___react@19.2.7___react-dom@19.2.7____react@19.2.7__react@19.2.7__@stylexjs+stylex@0.19.0__react-dom@19.2.7___react@19.2.7_gpt-tokenizer@3.4.0",
     "npm:@astryxdesign/core@0.1.6": "0.1.6_@stylexjs+stylex@0.19.0_react@19.2.7_react-dom@19.2.7__react@19.2.7",
     "npm:@astryxdesign/theme-neutral@0.1.6": "0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7_@stylexjs+stylex@0.19.0_react-dom@19.2.7__react@19.2.7",
-    "npm:@astryxdesign/theme-stone@0.1.6": "0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7",
-    "npm:@astryxdesign/theme-y2k@0.1.6": "0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7",
     "npm:@stylexjs/stylex@0.19.0": "0.19.0",
     "npm:@types/node@26": "26.1.1",
     "npm:@types/react-dom@^19.2.3": "19.2.3_@types+react@19.2.17",
@@ -115,22 +113,6 @@
     },
     "@astryxdesign/theme-neutral@0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7_@stylexjs+stylex@0.19.0_react-dom@19.2.7__react@19.2.7": {
       "integrity": "sha512-sgjAIYXsT/BkkzNZ8cCdfMfxY18zYlLl8z0RNkQefuV4yN/PSfkMSrjiG0S6BfJLvP84xjxW39fx500Q4wLjtA==",
-      "dependencies": [
-        "@astryxdesign/core",
-        "lucide-react",
-        "react"
-      ]
-    },
-    "@astryxdesign/theme-stone@0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7": {
-      "integrity": "sha512-NOpx77EC1+YZifFpWoQaRZmf1+w9kg94APmsLm9T3PbMa3rU6CkRh6BptCeBbxm+wCq7UZxZha0umqjnxQ1hgA==",
-      "dependencies": [
-        "@astryxdesign/core",
-        "lucide-react",
-        "react"
-      ]
-    },
-    "@astryxdesign/theme-y2k@0.1.6_@astryxdesign+core@0.1.6__@stylexjs+stylex@0.19.0__react@19.2.7__react-dom@19.2.7___react@19.2.7_react@19.2.7": {
-      "integrity": "sha512-PK4Fj3u2N5oaNh/i1n0He+S3AOrdeYaCDgsZkXDd/rq/koixT3ENbfqM4EPIVdoNci142697K7c6eDjkeMSwlw==",
       "dependencies": [
         "@astryxdesign/core",
         "lucide-react",
@@ -1122,8 +1104,6 @@
       "npm:@astryxdesign/cli@0.1.6",
       "npm:@astryxdesign/core@0.1.6",
       "npm:@astryxdesign/theme-neutral@0.1.6",
-      "npm:@astryxdesign/theme-stone@0.1.6",
-      "npm:@astryxdesign/theme-y2k@0.1.6",
       "npm:@stylexjs/stylex@0.19.0",
       "npm:@vitejs/plugin-react@6.0.3",
       "npm:lucide-react@1.25.0",
@@ -1136,8 +1116,6 @@
         "npm:@astryxdesign/cli@0.1.6",
         "npm:@astryxdesign/core@0.1.6",
         "npm:@astryxdesign/theme-neutral@0.1.6",
-        "npm:@astryxdesign/theme-stone@0.1.6",
-        "npm:@astryxdesign/theme-y2k@0.1.6",
         "npm:@stylexjs/stylex@0.19.0",
         "npm:@types/node@26",
         "npm:@types/react-dom@^19.2.3",
