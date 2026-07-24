@@ -1,12 +1,7 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { HStack } from "@astryxdesign/core/HStack";
-import {
-  Layout,
-  LayoutContent,
-  LayoutFooter,
-  LayoutHeader,
-} from "@astryxdesign/core/Layout";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useState } from "react";
@@ -63,22 +58,19 @@ export function StationEditor({ station, onClose, onSave, notify }: {
       onOpenChange={(open) => !open && onClose()}
       purpose="form"
       width={560}
-      padding={0}
     >
       <Layout
         height="auto"
         header={
-          <LayoutHeader padding={0}>
-            <DialogHeader
-              title={station ? "Edit station" : "Add station"}
-              subtitle="Manual preset"
-              hasDivider
-              onOpenChange={(open) => !open && onClose()}
-            />
-          </LayoutHeader>
+          <DialogHeader
+            title={station ? "Edit station" : "Add station"}
+            subtitle="Manual preset"
+            hasDivider
+            onOpenChange={(open) => !open && onClose()}
+          />
         }
         content={
-          <LayoutContent padding={6}>
+          <LayoutContent>
             <form id={formId} onSubmit={submit}>
               <VStack gap={5}>
                 <TextInput

@@ -1,7 +1,7 @@
 import { type DefinedTheme, defineTheme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral";
 
-export type PaletteName = "air" | "tide" | "ember";
+export type PaletteName = "signal" | "tide" | "ember";
 
 const sharedTheme = {
   extends: neutralTheme,
@@ -44,10 +44,10 @@ function paletteTheme(
 }
 
 export const airwaveThemes: Record<PaletteName, DefinedTheme> = {
-  air: paletteTheme(
-    "airwave-air",
-    ["#5367C9", "#AEB8FF"],
-    ["#5367C926", "#AEB8FF2E"],
+  signal: paletteTheme(
+    "airwave-signal",
+    ["#B0740E", "#F2B84B"],
+    ["#B0740E26", "#F2B84B2E"],
   ),
   tide: paletteTheme(
     "airwave-tide",
@@ -56,17 +56,17 @@ export const airwaveThemes: Record<PaletteName, DefinedTheme> = {
   ),
   ember: paletteTheme(
     "airwave-ember",
-    ["#B45449", "#F3A79D"],
-    ["#B4544926", "#F3A79D2E"],
+    ["#B4433A", "#F3A79D"],
+    ["#B4433A26", "#F3A79D2E"],
   ),
 };
 
 export const paletteOptions = [
-  { value: "air", label: "Air" },
+  { value: "signal", label: "Signal" },
   { value: "tide", label: "Tide" },
   { value: "ember", label: "Ember" },
 ];
 
 export function isPaletteName(value: string): value is PaletteName {
-  return value === "air" || value === "tide" || value === "ember";
+  return value === "signal" || value === "tide" || value === "ember";
 }

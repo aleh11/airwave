@@ -51,9 +51,9 @@ import type {
   BluetoothDevice,
   BluetoothDiagnostics,
 } from "../types.ts";
-import { errorMessage, type Notify, PageFrame } from "../ui.tsx";
+import { errorMessage, type Notify } from "../ui.tsx";
 
-export function AudioView({ notify }: { notify: Notify }) {
+export function BluetoothSettings({ notify }: { notify: Notify }) {
   const [status, setStatus] = useState<BluetoothAudioStatus | null>(null);
   const [diagnostics, setDiagnostics] = useState<BluetoothDiagnostics | null>(
     null,
@@ -216,11 +216,7 @@ export function AudioView({ notify }: { notify: Notify }) {
 
   return (
     <>
-      <PageFrame
-        eyebrow="Receiver output"
-        title="Audio"
-        description="Pair a Bluetooth speaker or headphones, then choose where the Pi plays."
-      >
+      <VStack gap={5}>
         {!loading && apiError && (
           <Banner
             status="error"
@@ -279,7 +275,7 @@ export function AudioView({ notify }: { notify: Notify }) {
               wrap="wrap"
             >
               <VStack gap={1}>
-                <Heading level={2}>Bluetooth devices</Heading>
+                <Heading level={3}>Bluetooth devices</Heading>
                 <Text color="secondary">
                   Put your speaker or headphones in pairing mode before
                   scanning.
@@ -346,7 +342,7 @@ export function AudioView({ notify }: { notify: Notify }) {
               "Bluetooth diagnostics refreshed.",
             )}
         />
-      </PageFrame>
+      </VStack>
       <AlertDialog
         isOpen={Boolean(pendingForget)}
         onOpenChange={(open) => !open && setPendingForget(null)}
@@ -509,7 +505,7 @@ function DiagnosticsPanel({
           <VStack gap={1}>
             <HStack gap={2} vAlign="center">
               <Icon icon={Bug} color="accent" size="sm" />
-              <Heading level={2}>Bluetooth diagnostics</Heading>
+              <Heading level={3}>Bluetooth diagnostics</Heading>
             </HStack>
             <Text color="secondary">
               Follow the production signal path and copy the evidence if a stage
@@ -649,7 +645,7 @@ function CurrentOutput({
                 : <Icon icon={RaspberryMark} color="accent" size="lg" />}
               <VStack gap={1}>
                 <Text type="label" color="accent">Current Pi output</Text>
-                <Heading level={2}>{outputName}</Heading>
+                <Heading level={3}>{outputName}</Heading>
                 <HStack gap={2} vAlign="center">
                   <StatusDot
                     variant={connectionVariant}

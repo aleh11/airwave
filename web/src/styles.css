@@ -1,37 +1,62 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
 
-.airwave-output-switcher {
-  padding: var(--spacing-1);
+.airwave-dial-frame {
+  padding: var(--spacing-4) var(--spacing-5) var(--spacing-3);
   border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-page);
-  background: color-mix(
-    in srgb,
-    var(--color-background-surface) 92%,
-    transparent
-  );
-  box-shadow: var(--shadow-low);
-  backdrop-filter: blur(var(--spacing-2));
+  border-radius: var(--radius-container);
+  background:
+    radial-gradient(
+    120% 160% at 50% -10%,
+    var(--color-accent-muted),
+    transparent 62%
+  ),
+    color-mix(in srgb, var(--color-background-surface) 60%, transparent);
 }
 
-.airwave-output-switcher svg {
-  width: var(--size-icon-sm);
-  height: var(--size-icon-sm);
+.airwave-dial {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
-.airwave-output-bar {
-  flex-shrink: 0;
-  padding-block-start: var(--spacing-3);
-  padding-inline: var(--spacing-6);
+.airwave-dial-needle {
+  transform-box: view-box;
+  transition: transform var(--motion-slow, 700ms) cubic-bezier(0.22, 1, 0.36,
+    1);
 }
 
-@media (max-width: 640px) {
-  .airwave-output-bar {
-    padding-block-start: var(--spacing-2);
-    padding-inline: var(--spacing-4);
+.airwave-dial-needle.is-idle {
+  opacity: 0.45;
+}
+
+.airwave-dial-beam {
+  filter: drop-shadow(0 0 5px var(--color-accent-muted));
+}
+
+.airwave-dial-beam.is-live {
+  filter: drop-shadow(0 0 10px var(--color-accent));
+  animation: airwave-beam-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes airwave-beam-pulse {
+  0%,
+  100% {
+    opacity: 1;
   }
 
-  .astryx-date-time-input {
-    flex-direction: column;
+  50% {
+    opacity: 0.68;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .airwave-dial-needle {
+    transition: none;
+  }
+
+  .airwave-dial-beam.is-live {
+    animation: none;
   }
 }

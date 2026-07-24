@@ -1,14 +1,8 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { Button } from "@astryxdesign/core/Button";
-import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from "@astryxdesign/core/SegmentedControl";
-import { Selector } from "@astryxdesign/core/Selector";
 import {
   SideNav,
   SideNavHeading,
@@ -16,23 +10,11 @@ import {
   SideNavSection,
 } from "@astryxdesign/core/SideNav";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { Theme } from "@astryxdesign/core/theme";
 import { ToastViewport, useToast } from "@astryxdesign/core/Toast";
 import { VStack } from "@astryxdesign/core/VStack";
-import {
-  AlarmClock,
-  Compass,
-  Download,
-  Headphones,
-  Monitor,
-  Moon,
-  Palette,
-  RadioTower,
-  RefreshCw,
-  Sun,
-} from "lucide-react";
+import { Compass, Download, RadioTower, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   beginUpdate,
@@ -46,46 +28,32 @@ import {
   type StationDraft,
   updateStation,
 } from "./api.ts";
+import { SettingsDialog } from "./components/SettingsDialog.tsx";
 import { StationEditor } from "./components/StationEditor.tsx";
 import {
   UpdateDialog,
   type UpdateDialogModel,
 } from "./components/UpdateDialog.tsx";
 import { useRadioSocket } from "./hooks/useRadioSocket.ts";
-import { RaspberryMark } from "./icons.tsx";
-import {
-  airwaveThemes,
-  isPaletteName,
-  type PaletteName,
-  paletteOptions,
-} from "./theme.ts";
-import type {
-  PlaybackTarget,
-  Station,
-  UpdateStatus,
-  VersionInfo,
-} from "./types.ts";
+import { airwaveThemes, isPaletteName, type PaletteName } from "./theme.ts";
+import type { Station, UpdateStatus, VersionInfo } from "./types.ts";
 import { errorMessage, type Notify, ReceiverLoading } from "./ui.tsx";
 import { DiscoverView } from "./views/DiscoverView.tsx";
-import { AudioView } from "./views/AudioView.tsx";
 import { ListenView } from "./views/ListenView.tsx";
-import { ScheduleView } from "./views/ScheduleView.tsx";
 
-type View = "listen" | "discover" | "audio" | "schedule";
+type View = "listen" | "discover";
 type ColorMode = "light" | "dark";
 
 const navItems: Array<{ view: View; label: string; icon: typeof RadioTower }> =
   [
     { view: "listen", label: "Listen", icon: RadioTower },
     { view: "discover", label: "Discover", icon: Compass },
-    { view: "audio", label: "Audio", icon: Headphones },
-    { view: "schedule", label: "Schedule", icon: AlarmClock },
   ];
 
 export default function App() {
   const [palette, setPalette] = useState<PaletteName>(() => {
     const saved = readSetting("airwave-palette");
-    return saved && isPaletteName(saved) ? saved : "air";
+    return saved && isPaletteName(saved) ? saved : "signal";
   });
   const [mode, setMode] = useState<ColorMode>(() =>
     readSetting("airwave-mode") === "dark" ? "dark" : "light"
@@ -121,6 +89,7 @@ function Airwave({ palette, mode, setPalette, setMode }: {
   const [pendingDelete, setPendingDelete] = useState<Station | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [version, setVersion] = useState<VersionInfo | null>(null);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -332,6 +301,17 @@ function Airwave({ palette, mode, setPalette, setMode }: {
     }
   }, [notify, showToast]);
 
+  const openUpdateDialog = useCallback(() => {
+    if (!version?.updateAvailable || !version.latest) return;
+    setSettingsOpen(false);
+    setUpdateDialog({
+      currentVersion: version.current,
+      latestVersion: version.latest,
+      phase: "confirm",
+      message: null,
+    });
+  }, [version]);
+
   const navigation = (
     <SideNav
       header={
@@ -355,20 +335,12 @@ function Airwave({ palette, mode, setPalette, setMode }: {
         buttonLabel: "Collapse navigation",
       }}
       footer={sidebarCollapsed ? undefined : (
-        <VStack gap={4}>
-          <Selector
-            label="Colour palette"
-            value={palette}
-            options={paletteOptions}
-            startIcon={<Icon icon={Palette} size="sm" />}
-            onChange={(value) => isPaletteName(value) && setPalette(value)}
-          />
-          <Switch
-            label="Dark mode"
-            labelIcon={<Icon icon={mode === "dark" ? Moon : Sun} size="sm" />}
-            value={mode === "dark"}
-            onChange={(dark) => setMode(dark ? "dark" : "light")}
-            labelSpacing="spread"
+        <VStack gap={3}>
+          <Button
+            label="Settings"
+            variant="secondary"
+            icon={<Icon icon={Settings} size="sm" />}
+            onClick={() => setSettingsOpen(true)}
           />
           <Text type="supporting" color="secondary">
             {version?.updateAvailable && version.latest
@@ -379,17 +351,18 @@ function Airwave({ palette, mode, setPalette, setMode }: {
           </Text>
         </VStack>
       )}
-      footerIcons={
-        <IconButton
-          label="Check for updates"
-          tooltip="Check for updates"
-          icon={<Icon icon={RefreshCw} size="sm" />}
-          variant="ghost"
-          size="sm"
-          isLoading={checkingUpdates || updating}
-          onClick={checkUpdates}
-        />
-      }
+      footerIcons={sidebarCollapsed
+        ? (
+          <IconButton
+            label="Settings"
+            tooltip="Settings"
+            icon={<Icon icon={Settings} size="sm" />}
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+          />
+        )
+        : undefined}
     >
       <SideNavSection title="Radio" isHeaderHidden>
         {navItems.map((item) => (
@@ -424,33 +397,6 @@ function Airwave({ palette, mode, setPalette, setMode }: {
           ? <ReceiverLoading connected={connected} />
           : (
             <VStack gap={0} minHeight="100%">
-              <HStack
-                className="airwave-output-bar"
-                hAlign="end"
-                vAlign="center"
-              >
-                <HStack className="airwave-output-switcher" vAlign="center">
-                  <SegmentedControl
-                    label="Playback output"
-                    value={state.target}
-                    onChange={(target) =>
-                      isPlaybackTarget(target) &&
-                      send({ type: "setTarget", target })}
-                    size="sm"
-                  >
-                    <SegmentedControlItem
-                      value="browser"
-                      label="Browser"
-                      icon={<Icon icon={Monitor} size="sm" />}
-                    />
-                    <SegmentedControlItem
-                      value="appliance"
-                      label="Pi"
-                      icon={<RaspberryMark />}
-                    />
-                  </SegmentedControl>
-                </HStack>
-              </HStack>
               {view === "listen"
                 ? (
                   <ListenView
@@ -464,6 +410,8 @@ function Airwave({ palette, mode, setPalette, setMode }: {
                     onPrevious={() => stepStation(-1)}
                     onNext={() => stepStation(1)}
                     onVolume={(volume) => send({ type: "setVolume", volume })}
+                    onSetTarget={(target) =>
+                      send({ type: "setTarget", target })}
                     onSelect={selectStation}
                     onFavorite={toggleFavorite}
                     onEdit={setEditor}
@@ -472,22 +420,11 @@ function Airwave({ palette, mode, setPalette, setMode }: {
                     onDiscover={() => setView("discover")}
                   />
                 )
-                : view === "discover"
-                ? (
+                : (
                   <DiscoverView
                     savedStations={stations}
                     onSaved={refreshStations}
                     onPlay={selectStation}
-                    notify={notify}
-                  />
-                )
-                : view === "audio"
-                ? <AudioView notify={notify} />
-                : (
-                  <ScheduleView
-                    state={state}
-                    stations={stations}
-                    send={send}
                     notify={notify}
                   />
                 )}
@@ -519,6 +456,22 @@ function Airwave({ palette, mode, setPalette, setMode }: {
         onConfirm={installUpdate}
         onRetry={installUpdate}
       />
+      {settingsOpen && (
+        <SettingsDialog
+          palette={palette}
+          mode={mode}
+          setPalette={setPalette}
+          setMode={setMode}
+          version={version}
+          connected={connected}
+          checkingUpdates={checkingUpdates}
+          updating={updating}
+          onCheckUpdates={checkUpdates}
+          onUpdateNow={openUpdateDialog}
+          notify={notify}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -547,8 +500,4 @@ async function waitForUpdate(
 
 function readSetting(key: string): string | null {
   return globalThis.localStorage?.getItem(key) ?? null;
-}
-
-function isPlaybackTarget(value: string): value is PlaybackTarget {
-  return value === "browser" || value === "appliance";
 }
